@@ -86,7 +86,7 @@ const current = ref(1);
 const products = reactive([
   {
     product_id: 1,
-    product_name: 'iPhone 15 Pro Max',
+    product_name: 'iPhone 16 Pro Max',
     product_price: 9999,
     product_class: '电子产品',
     like_number: 1588,
@@ -101,7 +101,7 @@ const products = reactive([
     product_class: '服装',
     like_number: 765,
     sale_amount: 125,
-    product_picture: 'https://placehold.co/300x300?text=Jacket',
+    product_picture: 'https://placehold.co/300x300?text=Yurongfu',
     product_stock: 100
   },
   {
@@ -146,12 +146,12 @@ const products = reactive([
   },
   {
     product_id: 7,
-    product_name: '有机红茶',
+    product_name: '咖啡',
     product_price: 89,
     product_class: '食品',
     like_number: 123,
     sale_amount: 67,
-    product_picture: 'https://placehold.co/300x300?text=Tea',
+    product_picture: 'https://placehold.co/300x300?text=Coffee',
     product_stock: 100
   },
   {
@@ -161,7 +161,7 @@ const products = reactive([
     product_class: '图书',
     like_number: 567,
     sale_amount: 94,
-    product_picture: 'https://placehold.co/300x300?text=Algorithm',
+    product_picture: 'https://placehold.co/300x300?text=Algorithm Book',
     product_stock: 20
   }
 ]);

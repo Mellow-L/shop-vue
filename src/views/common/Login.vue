@@ -48,7 +48,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { reactive } from 'vue';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 
@@ -63,15 +63,27 @@ const formState = reactive({
 
 const onFinish = values => {
   console.log('登录表单提交的值:', values);
-  // 这里应该添加实际的登录API调用
-  // 为了演示，我们直接显示成功消息并跳转
-  message.success('登录成功!');
-  
-  // 根据是否是管理员决定跳转位置
-  if (formState.isAdmin) {
-    router.push('/admin/products'); // 跳转到管理员页面
+  // --- 模拟登录成功 ---
+  // 在实际应用中，这里应该调用后端 API 验证
+  // const loginSuccess = await backendLogin(values);
+  const loginSuccess = true; // 假设登录总是成功
+
+  if (loginSuccess) {
+    // 存储登录状态和角色到 localStorage
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('isAdmin', formState.isAdmin ? 'true' : 'false');
+    
+    message.success('登录成功!');
+    
+    // 根据是否是管理员决定跳转位置
+    if (formState.isAdmin) {
+      router.push('/admin/products'); // 跳转到管理员页面
+    } else {
+      router.push('/'); // 跳转到普通用户主页
+    }
   } else {
-    router.push('/'); // 跳转到普通用户页面
+    // 实际应用中处理登录失败
+     message.error('邮箱或密码错误!');
   }
 };
 </script>

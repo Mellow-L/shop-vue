@@ -1,5 +1,5 @@
 <template>
-  <div class="product-detail-container">
+  <div v-if="product.product_id" class="product-detail-container">
     <a-breadcrumb class="breadcrumb">
       <a-breadcrumb-item>
         <router-link to="/">首页</router-link>
@@ -60,7 +60,7 @@
                 <a-input-number 
                   v-model:value="quantity" 
                   :min="1" 
-                  :max="product.product_stock"
+                  :max="product.product_stock || 1"
                   :disabled="!product.product_stock || product.product_stock <= 0"
                 />
               </div>
@@ -99,6 +99,9 @@
       </a-col>
     </a-row>
   </div>
+  <div v-else>
+    <a-spin size="large" />
+  </div>
 </template>
 
 <script setup>
@@ -110,34 +113,68 @@ import { LikeOutlined, LikeFilled } from '@ant-design/icons-vue';
 const router = useRouter();
 const route = useRoute();
 
-const product = reactive({
-  product_id: 1,
-  product_name: 'iPhone 15 Pro Max',
-  product_class: '电子产品',
-  product_price: 9999,
-  like_number: 1588,
-  product_stock: 50,
-  sale_amount: 1200,
-  product_picture: 'https://placehold.co/600x600?text=iPhone',
-});
+// Mock Product Data (Simulating a backend database)
+const mockProductDatabase = [
+  { product_id: 1, product_name: 'iPhone 15 Pro Max', product_class: '电子产品', product_price: 9999, like_number: 1588, product_stock: 50, sale_amount: 246, product_picture: 'https://placehold.co/600x600?text=iPhone' },
+  { product_id: 2, product_name: '轻薄羽绒服', product_class: '服装', product_price: 599, like_number: 765, product_stock: 100, sale_amount: 125, product_picture: 'https://placehold.co/600x600?text=Jacket' },
+  { product_id: 3, product_name: '有机水果礼盒', product_class: '食品', product_price: 199, like_number: 432, product_stock: 200, sale_amount: 89, product_picture: 'https://placehold.co/600x600?text=Fruits' },
+  { product_id: 4, product_name: '计算机编程入门', product_class: '图书', product_price: 79, like_number: 670, product_stock: null, sale_amount: 106, product_picture: 'https://placehold.co/600x600?text=Book' },
+  { product_id: 5, product_name: '智能手表', product_class: '电子产品', product_price: 1599, like_number: 345, product_stock: 30, sale_amount: 78, product_picture: 'https://placehold.co/600x600?text=Watch' },
+  { product_id: 6, product_name: '运动跑鞋', product_class: '服装', product_price: 499, like_number: 234, product_stock: 50, sale_amount: 112, product_picture: 'https://placehold.co/600x600?text=Shoes' },
+  { product_id: 7, product_name: '有机红茶', product_class: '食品', product_price: 89, like_number: 123, product_stock: 100, sale_amount: 67, product_picture: 'https://placehold.co/600x600?text=Tea' },
+  { product_id: 8, product_name: '数据结构与算法', product_class: '图书', product_price: 99, like_number: 567, product_stock: 20, sale_amount: 94, product_picture: 'https://placehold.co/600x600?text=Algorithm' }
+];
 
+// Function to simulate fetching product details
+const fetchProductById = (id) => {
+  return new Promise((resolve) => {
+    // Simulate network delay
+    setTimeout(() => {
+      const foundProduct = mockProductDatabase.find(p => p.product_id === parseInt(id));
+      resolve(foundProduct);
+    }, 300); // 300ms delay
+  });
+};
+
+// Initialize product as an empty object or null initially
+const product = reactive({}); 
 const quantity = ref(1);
 const isLiked = ref(false);
 
-onMounted(() => {
+onMounted(async () => {
   const productId = route.params.id;
   console.log('Fetching product detail for ID:', productId);
+  if (productId) {
+    const fetchedProduct = await fetchProductById(productId);
+    if (fetchedProduct) {
+      // Update the reactive object with fetched data
+      Object.assign(product, fetchedProduct); 
+      console.log('Product data loaded:', product);
+    } else {
+      console.error('Product not found!');
+      message.error('未找到该商品');
+      // Optionally redirect to a 404 page or back
+      router.replace('/'); 
+    }
+  } else {
+    console.error('No product ID found in route parameters');
+    message.error('无效的商品链接');
+    router.replace('/');
+  }
 });
 
 const addToCart = () => {
+  if (!product.product_id) return; // Prevent action if product not loaded
   message.success(`已将 ${product.product_name} × ${quantity.value} 加入购物车`);
 };
 
 const buyNow = () => {
+   if (!product.product_id) return;
   message.success(`正在跳转到结算页面...`);
 };
 
 const toggleLike = () => {
+   if (!product.product_id) return;
   isLiked.value = !isLiked.value;
   if (isLiked.value) {
     product.like_number = (product.like_number || 0) + 1;
@@ -146,6 +183,7 @@ const toggleLike = () => {
     product.like_number = Math.max(0, (product.like_number || 0) - 1);
     message.success(`已取消点赞 ${product.product_name}`);
   }
+  // TODO: Add backend API call here
 };
 </script>
 
@@ -250,30 +288,25 @@ const toggleLike = () => {
 
 .product-actions {
   display: flex;
-  gap: 16px;
-  margin: 24px 0;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
 }
 
-.buy-now-btn {
-  background-color: #f5222d;
-  border-color: #f5222d;
-}
-
-.buy-now-btn:hover {
-  background-color: #ff4d4f;
-  border-color: #ff4d4f;
+.buy-now-btn, .add-to-cart-btn, .like-btn {
+  flex-grow: 1; /* Allow buttons to grow */
 }
 
 .like-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  min-width: 120px; /* Ensure like button has some width */
 }
 
-@media (max-width: 768px) {
-  .product-actions {
-    flex-direction: column;
-  }
+/* Add loading state style */
+.product-detail-container[v-else] {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px; /* Ensure spinner is visible */
 }
 </style>
   

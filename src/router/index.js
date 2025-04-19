@@ -11,6 +11,7 @@ import MyOrders from '@/views/user/MyOrders.vue'
 import MyProfile from '@/views/user/MyProfile.vue'
 import ProductDetail from '@/views/user/ProductDetail.vue'
 import OrderDetail from '@/views/user/OrderDetail.vue'
+import ChangePassword from '@/views/user/ChangePassword.vue'
 
 // admin
 import ManageOrders from '@/views/admin/ManageOrders.vue'
@@ -36,6 +37,7 @@ const routes = [
       { path: '/profile', name: 'MyProfile', component: MyProfile },
       { path: '/product/:id', name: 'ProductDetail', component: ProductDetail },
       { path: '/order/:id', name: 'OrderDetail', component: OrderDetail },
+      { path: '/change-password', name: 'ChangePassword', component: ChangePassword },
     ],
   },
 

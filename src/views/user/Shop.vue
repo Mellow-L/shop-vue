@@ -86,7 +86,7 @@ const current = ref(1);
 const products = reactive([
   {
     product_id: 1,
-    product_name: 'iPhone 16 Pro Max',
+    product_name: 'iPhone 15 Pro Max',
     product_price: 9999,
     product_class: '电子产品',
     like_number: 1588,

@@ -173,11 +173,11 @@
           </a-col>
           <a-col :span="12">
             <a-form-item 
-              label="手机号码" 
+              label="邮箱" 
               name="recipient_phone" 
-              :rules="[{ required: true, message: '请输入手机号码' }, { pattern: /^1[3-9]\d{9}$/, message: '手机号码格式不正确' }]"
+              :rules="[{ required: true, message: '请输入电子邮箱' }, { pattern: /^1[3-9]\d{9}$/, message: '电子邮箱格式不正确' }]"
             >
-              <a-input v-model:value="addressForm.recipient_phone" placeholder="请输入手机号码" />
+              <a-input v-model:value="addressForm.recipient_phone" placeholder="请输入电子邮箱" />
             </a-form-item>
           </a-col>
         </a-row>

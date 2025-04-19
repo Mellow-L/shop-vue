@@ -64,3 +64,6 @@ const router = createRouter({
 });
 
 export default router;
+export function gotoLogin(){
+  router.push({name:'Login'})
+}

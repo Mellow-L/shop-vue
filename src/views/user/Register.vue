@@ -9,7 +9,7 @@
         :label-col="{ span: 6 }"
         :wrapper-col="{ span: 18 }"
         autocomplete="off"
-        @finish="onFinish"
+        @finish="onRegister"
       >
         <a-form-item
           label="电子邮箱"
@@ -53,8 +53,15 @@
         </a-form-item>
 
         <a-form-item :wrapper-col="{ offset: 6, span: 18 }">
-          <a-button type="primary" html-type="submit" class="register-form-button"
-            :disabled="!formState.agreement">注册</a-button>
+          <a-button 
+            type="primary" 
+            html-type="submit" 
+            class="register-form-button"
+            :disabled="!formState.agreement"
+            :loading="submitting" 
+          >
+             {{ submitting ? '注册中...' : '注册' }}
+          </a-button>
           <div class="login-link">
             已有账号? <router-link to="/login">立即登录!</router-link>
           </div>
@@ -65,12 +72,14 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
+import { gotoLogin } from '../../router';
+import { apiRegisterUser } from '../../api/user';
 
 const router = useRouter();
-
+const submitting = ref(false);
 const formState = reactive({
   email: '',
   password: '',
@@ -88,13 +97,26 @@ const validateConfirmPassword = async (rule, value) => {
   return Promise.resolve();
 };
 
-const onFinish = values => {
-  console.log('注册表单提交的值:', values);
-  // 这里应该添加实际的注册API调用
-  // 为了演示，我们直接显示成功消息并跳转
-  message.success('注册成功!');
-  router.push('/login');
+const onRegister = async formData => {
+  submitting.value = true;
+  try {
+    const loginData = {
+      email: formState.email,
+      password: formState.password
+    };
+    let data = await apiRegisterUser(loginData);
+    if(data){
+      message.success('注册成功,请登录');
+    } 
+    gotoLogin()
+  } catch (error) {
+    console.error("注册失败:", error);
+    message.error('注册失败，请重试');
+  } finally {
+    submitting.value = false;
+  }
 };
+
 </script>
 
 <style scoped>

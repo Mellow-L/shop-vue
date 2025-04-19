@@ -99,6 +99,7 @@
 <script setup>
 import { ref, computed, reactive } from 'vue'; 
 import { message } from 'ant-design-vue';
+import { useRouter } from 'vue-router';
 
 // 搜索值
 const searchValue = ref('');
@@ -220,17 +221,31 @@ const removeSelectedItems = () => {
   message.success('选中的商品已移除');
 };
 
-// 结算选中项
+const router = useRouter();
+
+// Checkout selected items
 const checkoutSelected = () => {
   const selectedItems = cartItems.filter(item => selectedRowKeys.value.includes(item.id));
   if (selectedItems.length === 0) {
     message.warning('请先选择要结算的商品');
     return;
   }
-  console.log('结算选中的商品:', selectedItems);
-  message.success(`正在结算 ${selectedItems.length} 种选中的商品...`);
-  // 在实际应用中，这里应该调用结算API，传递 selectedItems 数据
-  // router.push('/checkout');
+  
+  // Prepare items for confirmation page (ensure structure matches what OrderConfirmation expects)
+  const itemsForConfirmation = selectedItems.map(item => ({
+      product_id: item.id,
+      product_name: item.name,
+      product_price: item.price,
+      product_picture: item.image,
+      product_stock: 99, // Assuming a default stock if not available in cart data, adjust as needed
+      quantity: item.quantity,
+  }));
+
+  // Store the selected items in sessionStorage
+  sessionStorage.setItem('orderConfirmationItems', JSON.stringify(itemsForConfirmation));
+  
+  // Navigate to the confirmation page
+  router.push('/confirm-order');
 };
 
 </script>

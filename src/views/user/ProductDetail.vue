@@ -170,7 +170,22 @@ const addToCart = () => {
 
 const buyNow = () => {
    if (!product.product_id) return;
-  message.success(`正在跳转到结算页面...`);
+   // Prepare item data for confirmation page
+   const itemForConfirmation = {
+     // Include necessary product details
+     product_id: product.product_id,
+     product_name: product.product_name,
+     product_price: product.product_price,
+     product_picture: product.product_picture,
+     product_stock: product.product_stock, 
+     quantity: quantity.value, // Use the selected quantity
+   };
+   
+   // Store the item (as an array) in sessionStorage
+   sessionStorage.setItem('orderConfirmationItems', JSON.stringify([itemForConfirmation]));
+   
+   // Navigate to the confirmation page
+   router.push('/confirm-order');
 };
 
 const toggleLike = () => {

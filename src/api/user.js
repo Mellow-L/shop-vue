@@ -15,14 +15,27 @@ export async function apiRegisterUser(formData) {
         console.log("注册成功",res.data);
         return Promise.resolve(res.data)
     }else{
-        console.error("注册失败:", error);
+        console.error("注册失败:");
     }
 }
+
 export async function apiLogin(formData) {
-    let res =  axios.post('/api/user/login', formData);
-    if(res?.data){
-        return Promise.resolve(res.data)
-    }else{
-        alertFail(apiLogin.name,"Fail to login")
+  try {
+    const form = new FormData();
+    form.append('email', formData.email);
+    form.append('password', formData.password);
+    form.append('isManager', formData.isManager); // 字符串或布尔都可
+    const res = await axios.post('/api/user/login', form); // 不加 headers，axios 会自动设置 multipart/form-data
+    if (res?.data) {
+      return res.data;
+    } else {
+      throw new Error("登录失败：无响应数据");
     }
+  } catch (error) {
+    console.error("apiLogin 错误：", error);
+    if (error.response) {
+      console.error("后端响应:", error.response.data);
+    }
+    throw error;
+  }
 }

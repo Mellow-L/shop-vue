@@ -100,15 +100,15 @@ const validateConfirmPassword = async (rule, value) => {
 const onRegister = async formData => {
   submitting.value = true;
   try {
-    const loginData = {
+    const registerData = {
       email: formState.email,
       password: formState.password
     };
-    let data = await apiRegisterUser(loginData);
+    let data = await apiRegisterUser(registerData);
     if(data){
       message.success('注册成功,请登录');
     } 
-    gotoLogin()
+    router.push('/login');
   } catch (error) {
     console.error("注册失败:", error);
     message.error('注册失败，请重试');

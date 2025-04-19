@@ -9,7 +9,7 @@
         :label-col="{ span: 6 }"
         :wrapper-col="{ span: 18 }"
         autocomplete="off"
-        @finish="onFinish"
+        @finish="onLogin"
       >
         <a-form-item
           label="电子邮箱"
@@ -33,7 +33,7 @@
         <a-form-item :wrapper-col="{ offset: 6, span: 18 }">
           <div class="login-options">
             <a-checkbox v-model:checked="formState.remember">记住密码</a-checkbox>
-            <a-checkbox v-model:checked="formState.isAdmin">我是管理员</a-checkbox>
+            <a-checkbox v-model:checked="formState.isManager">我是管理员</a-checkbox>
           </div>
           <a class="login-form-forgot" href="">忘记密码</a>
         </a-form-item>
@@ -51,6 +51,7 @@
 import { reactive } from 'vue';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
+import { apiLogin } from '../../api/user';
 
 const router = useRouter();
 
@@ -58,34 +59,39 @@ const formState = reactive({
   email: '',
   password: '',
   remember: true,
-  isAdmin: false,
+  isManager: false,
 });
 
-const onFinish = values => {
-  console.log('登录表单提交的值:', values);
-  // --- 模拟登录成功 ---
-  // 在实际应用中，这里应该调用后端 API 验证
-  // const loginSuccess = await backendLogin(values);
-  const loginSuccess = true; // 假设登录总是成功
+const onLogin = async () => { 
+  try {
+    const loginPayload = {
+      email: formState.email,
+      password: formState.password,
+      isManager: formState.isManager, 
+    };
+    console.log('传递给 apiLogin 的数据:', loginPayload);
+    const data = await apiLogin(loginPayload);
 
-  if (loginSuccess) {
-    // 存储登录状态和角色到 localStorage
+    // ... 登录成功后的逻辑 (localStorage, message, router.push) ...
     localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('isAdmin', formState.isAdmin ? 'true' : 'false');
-    
+    // 使用传递给 apiLogin 的 isManager 值
+    localStorage.setItem('isManager', loginPayload.isManager ? 'true' : 'false');
+
     message.success('登录成功!');
-    
-    // 根据是否是管理员决定跳转位置
-    if (formState.isAdmin) {
-      router.push('/admin/products'); // 跳转到管理员页面
+
+    if (loginPayload.isManager) {
+      router.push('/admin/products');
     } else {
-      router.push('/'); // 跳转到普通用户主页
+      router.push('/');
     }
-  } else {
-    // 实际应用中处理登录失败
-     message.error('邮箱或密码错误!');
+
+  } catch (error) {
+    
+    console.error('登录失败:', error);
+    message.error(error.message || '登录失败，请稍后重试。');
   }
 };
+
 </script>
 
 <style scoped>

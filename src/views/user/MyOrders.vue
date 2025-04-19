@@ -4,7 +4,6 @@
     
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane key="all" tab="全部订单"></a-tab-pane>
-      <a-tab-pane key="pending" tab="待付款"></a-tab-pane>
       <a-tab-pane key="processing" tab="待发货"></a-tab-pane>
       <a-tab-pane key="shipped" tab="待收货"></a-tab-pane>
       <a-tab-pane key="completed" tab="已完成"></a-tab-pane>
@@ -157,7 +156,7 @@ const orders = reactive([
   },
   {
     order_id: 'ORD20240503003',
-    order_state: 'pending',
+    order_state: 'cancelled',
     receiver: '王五',
     address: '广州市天河区xxx大道xxx号',
     user_id: 10003,
@@ -208,7 +207,6 @@ const pagination = {
 
 const getStatusText = (status) => {
   const statusMap = {
-    'pending': '待付款',
     'processing': '待发货',
     'shipped': '待收货',
     'completed': '已完成',

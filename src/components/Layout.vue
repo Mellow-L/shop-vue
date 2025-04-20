@@ -95,9 +95,9 @@ const isAdmin = ref(false);
 // 检查本地存储的登录状态
 const checkLoginStatus = () => {
   const loggedInStatus = localStorage.getItem('isLoggedIn');
-  const adminStatus = localStorage.getItem('isAdmin');
+  const managerStatus = localStorage.getItem('isManager'); 
   isLoggedIn.value = loggedInStatus === 'true';
-  isAdmin.value = adminStatus === 'true';
+  isAdmin.value = managerStatus === 'true';
   
   // 根据状态更新 selectedKeys (可选)
   if (isLoggedIn.value) {
@@ -146,7 +146,9 @@ const goTo = (path) => {
 // 退出登录处理
 const logout = () => {
   localStorage.removeItem('isLoggedIn');
-  localStorage.removeItem('isAdmin');
+  localStorage.removeItem('isManager'); 
+  localStorage.removeItem('userInfo'); // Make sure userInfo is cleared too
+
   isLoggedIn.value = false; // 更新本地状态
   isAdmin.value = false;
   message.success('已退出登录');

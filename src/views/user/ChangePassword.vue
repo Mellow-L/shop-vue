@@ -34,6 +34,8 @@
 import { reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
+// Import the API function
+import { apiUpdatePassword } from '../../api/user'; 
 
 const router = useRouter();
 const formRef = ref();
@@ -45,14 +47,32 @@ const formState = reactive({
   confirmPassword: '',
 });
 
-// --- Validation Rules ---
+// --- Helper: Get User ID --- 
+const getUserIdFromStorage = () => {
+   const storageKey = 'userInfo';
+   const userIdProperty = 'user_id'; 
+   try {
+     const userInfoString = localStorage.getItem(storageKey);
+     if (userInfoString) {
+       const userInfoObject = JSON.parse(userInfoString);
+       if (userInfoObject && typeof userInfoObject === 'object' && userIdProperty in userInfoObject) {
+           return userInfoObject[userIdProperty];
+       } 
+     }
+   } catch (e) {
+     console.error(`Error getting user ID from localStorage ('${storageKey}' -> '${userIdProperty}'):`, e);
+   } 
+   console.warn('Failed to get user ID from localStorage.');
+   return null;
+};
+
+// --- Validation Rules --- 
 const validatePass = async (_rule, value) => {
   if (value === '') {
     return Promise.reject('请输入新密码');
   } else if (value.length < 6) {
      return Promise.reject('密码长度不能少于6位');
   }
-  // Check confirm password if it's already entered
   if (formState.confirmPassword !== '') {
     formRef.value.validateFields('confirmPassword');
   }
@@ -77,27 +97,40 @@ const rules = {
 // --- End Validation Rules ---
 
 const onFinish = async values => {
-  console.log('修改密码表单提交的值:', values);
+  console.log('修改密码表单提交的值: ', values);
   submitting.value = true;
-  
-  // --- Simulate API Call ---
-  await new Promise(resolve => setTimeout(resolve, 1000)); 
-  // In a real app, you'd call your backend API here to verify the current password 
-  // and update it with the new password.
-  
-  // Example: Simulate success based on a simple check (replace with actual API logic)
-  const mockCurrentPasswordCorrect = formState.currentPassword === '123456'; // Replace with real check
 
-  if (mockCurrentPasswordCorrect) {
-      message.success('密码修改成功!');
-      // Optionally clear login state and redirect to login, or just go back
-      router.go(-1); // Go back to the previous page (Profile)
-  } else {
-      message.error('当前密码错误!');
+  const userId = getUserIdFromStorage();
+  if (!userId) {
+      message.error("无法获取用户信息，请重新登录后尝试修改密码。");
+      submitting.value = false;
+      return;
   }
-  // --- End Simulate API Call ---
 
-  submitting.value = false;
+  // --- Actual API Call --- 
+  try {
+      // Pass userId, currentPassword, and newPassword to the updated API function
+      const res = await apiUpdatePassword(
+          userId, 
+          formState.currentPassword, // Pass current password
+          formState.newPassword
+      );
+      
+      if (res && res.code === 200) {
+          message.info('密码已更新，请重新登录以使更改生效（如果需要）。'); 
+          formRef.value.resetFields();
+          router.go(-1); 
+      } else {
+           console.error("修改密码失败，响应:", res);
+           // Failure message is handled by apiUpdatePassword
+      }
+  } catch (error) {
+      console.error("调用修改密码 API 时出错:", error);
+      // Failure message is handled by apiUpdatePassword
+  } finally {
+      submitting.value = false;
+  }
+  // --- End Actual API Call ---
 };
 
 const goBack = () => {

@@ -63,33 +63,46 @@ const formState = reactive({
 });
 
 const onLogin = async () => { 
-  try {
     const loginPayload = {
       email: formState.email,
       password: formState.password,
       isManager: formState.isManager, 
     };
-    console.log('传递给 apiLogin 的数据:', loginPayload);
-    const data = await apiLogin(loginPayload);
 
-    // ... 登录成功后的逻辑 (localStorage, message, router.push) ...
-    localStorage.setItem('isLoggedIn', 'true');
-    // 使用传递给 apiLogin 的 isManager 值
-    localStorage.setItem('isManager', loginPayload.isManager ? 'true' : 'false');
+    try {
+        // 调用 apiLogin，它内部会处理成功或失败（特定原因）的消息
+        const res = await apiLogin(loginPayload); 
 
-    message.success('登录成功!');
+        // 检查 API 调用是否成功并返回了 user 数据
+        if (res && res.code === 200 && res.user) {
+            // *** 存储用户信息到 localStorage ***
+            try {
+                localStorage.setItem('userInfo', JSON.stringify(res.user));
+                localStorage.setItem('isLoggedIn', 'true'); 
+                localStorage.setItem('isManager', loginPayload.isManager ? 'true' : 'false');
+                console.log('Login successful, userInfo saved:', res.user);
 
-    if (loginPayload.isManager) {
-      router.push('/admin/products');
-    } else {
-      router.push('/');
+                // 根据是否为管理员进行跳转
+                if (loginPayload.isManager) {
+                    router.push('/admin/products');
+                } else {
+                    router.push('/');
+                }
+            } catch (storageError) {
+                console.error("Failed to save user info to localStorage:", storageError);
+                // 这个错误比较特殊，需要提示
+                message.error('无法保存登录状态，请稍后重试'); 
+            }
+        } else {
+            // *** 不需要这里的 message.error ***
+            // apiLogin 内部应该已经显示了具体的失败消息 (如"用户不存在", "密码错误")
+            console.log("Login API call returned non-200 or missing user data:", res);
+        }
+    } catch (error) {
+        // *** 不需要这里的 message.error ***
+        // apiLogin 内部在其 catch 块中处理了网络等错误
+        console.error("Error during login process (network or other):", error);
     }
-
-  } catch (error) {
-    
-    console.error('登录失败:', error);
-    message.error(error.message || '登录失败，请稍后重试。');
-  }
 };
 
 </script>

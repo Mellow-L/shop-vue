@@ -155,7 +155,7 @@ const formatPrice = (price) => {
 const mapFrontendStateToApiState = (frontendState) => {
   const map = {
     pending: '待发货',
-    shipped: '已发货',
+    shipped: '待收货',
     completed: '已完成',
     cancelled: '已取消',
   };
@@ -193,7 +193,6 @@ const fetchOrders = async (state = null) => {
           case '待发货':
               internalState = 'pending'; break; 
           case '待收货':
-          case '已发货':
               internalState = 'shipped'; break; 
           case '已完成': 
               internalState = 'completed'; break;

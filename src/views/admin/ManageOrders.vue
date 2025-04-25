@@ -23,7 +23,7 @@
         @search="onSearch"
       />
     </div>
-
+    
     <div v-if="loading" class="loading-container">
       <a-spin tip="加载订单中..." />
     </div>
@@ -274,7 +274,7 @@ const filteredOrders = computed(() => {
       (order.products && order.products.some(p => p.product_name && p.product_name.toLowerCase().includes(lowerSearch)))
     );
   }
-  
+
   return result;
 });
 
@@ -539,4 +539,4 @@ onMounted(() => {
 </style>
   
   
-
+  

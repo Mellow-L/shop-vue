@@ -32,7 +32,7 @@ export async function apiAddProductPicture(productId, picture) {
     const formData = new FormData();
     formData.append('product_id', productId);
     formData.append('product_picture', picture);
-    const res = await axios.post('/api/product/add/product_picture', formData);
+    const res = await axios.put('/api/product/add/product_picture', formData);
     if (res?.data?.code === 200) {
         showSuccess(apiAddProductPicture.name, "商品图片上传成功");
         return res.data;
@@ -111,17 +111,23 @@ export async function apiSearchProducts(productName, params = {}) {
 
 // 商品管理
 export async function apiDeleteProduct(productId) {
+  const functionName = apiDeleteProduct.name;
   try {
-    const res = await axios.delete(`/api/product/delete/${productId}`);
+    // Use DELETE method, send product_id as a query parameter
+    const res = await axiosClient.delete(`/api/product/delete/product_id`, {
+        params: { product_id: productId } 
+    });
     if (res?.data?.code === 200) {
-        showSuccess(apiDeleteProduct.name, "商品删除成功");
+        showSuccess(functionName, "商品删除成功");
         return res.data;
     } else {
-        showFail(apiDeleteProduct.name, res?.data?.message || "商品删除失败");
-        throw new Error(res?.data?.message || "商品删除失败");
+        const errorMsg = res?.data?.message || "商品删除失败";
+        showFail(functionName, errorMsg);
+        throw new Error(errorMsg);
     }
   } catch (error) {
-    showFail(apiDeleteProduct.name, error.message || "商品删除失败");
+    const errorMsg = error.message || "商品删除时发生网络错误";
+    showFail(functionName, errorMsg);
     throw error;
   }
 }

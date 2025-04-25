@@ -15,6 +15,8 @@
         <a-select-option value="clothing">服装</a-select-option>
         <a-select-option value="food">食品</a-select-option>
         <a-select-option value="books">图书</a-select-option>
+        <a-select-option value="手机">手机</a-select-option>
+        <a-select-option value="电脑">电脑</a-select-option>
         <a-select-option value="裤子">裤子</a-select-option>
         <a-select-option value="衣服">衣服</a-select-option>
         <a-select-option value="鞋子">鞋子</a-select-option>
@@ -28,6 +30,7 @@
         style="width: 300px"
         enter-button
         @search="handleSearch"
+        allowClear
       />
     </div>
 

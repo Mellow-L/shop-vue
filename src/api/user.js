@@ -88,7 +88,7 @@ export async function apiGetUserList() {
 // 搜索用户
 export async function apiSearchUserList(searchParams) {
   try {
-    const res = await axiosClient.get('/api/user/search', { params: searchParams });
+    const res = await axiosClient.get('/api/user/manager/find', { params: searchParams });
     if (res?.data?.code === 200) {
         return res.data;
     } else {

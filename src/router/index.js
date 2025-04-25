@@ -21,6 +21,7 @@ import ManageUsers from '@/views/admin/ManageUsers.vue'
 import ProductAdd from '@/views/admin/ProductAdd.vue'
 import ProductModify from '@/views/admin/ProductModify.vue'
 import OrderDetailManage from '@/views/admin/OrderDetailManage.vue'
+import UserDetailManage from '@/views/admin/UserDetailManage.vue'
 
 // 路由配置
 const routes = [
@@ -53,6 +54,7 @@ const routes = [
       { path: '/admin/orders/:id', name: 'AdminOrderDetail', component: OrderDetailManage },
       { path: '/admin/products', name: 'ManageProducts', component: ManageProducts },
       { path: '/admin/users', name: 'ManageUsers', component: ManageUsers },
+      { path: '/admin/user/:id', name: 'AdminUserDetail', component: UserDetailManage, props: true },
       { path: '/admin/product/add', name: 'ProductAdd', component: ProductAdd },
       { path: '/admin/product/modify/:id', name: 'ProductModify', component: ProductModify },
     ],

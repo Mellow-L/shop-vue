@@ -183,3 +183,111 @@ export async function apiUpdateOrderAddress(orderId, address) {
     throw error;
   }
 }
+
+// 标记订单为已发货 (使用 URL Params)
+export async function apiMarkOrderAsShipped(orderId) {
+  const functionName = apiMarkOrderAsShipped.name;
+  try {
+    // 使用 PUT 请求，将数据放在 URL 参数中，第三个参数是 config 对象
+    const res = await axiosClient.put(`/api/order/deliver`, null, { 
+      params: { 
+          order_id: orderId,
+          order_state: "待收货" 
+      }
+    });
+
+    if (res?.data?.code === 200) {
+        showSuccess(functionName, res.data.message || "订单标记为已发货成功");
+        return res.data;
+    } else {
+        const errorMsg = res?.data?.message || "标记订单为已发货失败";
+        showFail(functionName, errorMsg);
+        throw new Error(errorMsg);
+    }
+  } catch (error) {
+    const errorMsg = error.message || "标记订单为已发货时发生网络错误";
+    showFail(functionName, errorMsg);
+    throw error;
+  }
+}
+
+// 取消订单 (通过 deliver 接口，使用 URL Params)
+export async function apiCancelOrderByDeliver(orderId) {
+  const functionName = apiCancelOrderByDeliver.name;
+  try {
+    // 使用 PUT 请求，将数据放在 URL 参数中
+    const res = await axiosClient.put(`/api/order/deliver`, null, { 
+      params: {
+          order_id: orderId,
+          order_state: "已取消" 
+      }
+    });
+
+    if (res?.data?.code === 200) {
+        showSuccess(functionName, res.data.message || "订单取消成功");
+        return res.data;
+    } else {
+        const errorMsg = res?.data?.message || "取消订单失败";
+        showFail(functionName, errorMsg);
+        throw new Error(errorMsg);
+    }
+  } catch (error) {
+    const errorMsg = error.message || "取消订单时发生网络错误";
+    showFail(functionName, errorMsg);
+    throw error;
+  }
+}
+
+// 确认收货 (通过 deliver 接口，使用 URL Params)
+export async function apiConfirmReceiptByDeliver(orderId) {
+  const functionName = apiConfirmReceiptByDeliver.name;
+  try {
+    // 使用 PUT 请求，将数据放在 URL 参数中
+    const res = await axiosClient.put(`/api/order/deliver`, null, { 
+      params: {
+          order_id: orderId,
+          order_state: "已完成" 
+      }
+    });
+
+    if (res?.data?.code === 200) {
+        showSuccess(functionName, res.data.message || "确认收货成功");
+        return res.data;
+    } else {
+        const errorMsg = res?.data?.message || "确认收货失败";
+        showFail(functionName, errorMsg);
+        throw new Error(errorMsg);
+    }
+  } catch (error) {
+    const errorMsg = error.message || "确认收货时发生网络错误";
+    showFail(functionName, errorMsg);
+    throw error;
+  }
+}
+
+// 根据状态查询订单 (可选择按用户过滤)
+export async function apiFindOrdersByState(orderState, userId = null) {
+  const functionName = apiFindOrdersByState.name;
+  try {
+    const params = { order_state: orderState };
+    if (userId !== null) {
+      params.user_id = userId;
+    }
+    
+    // 假设后端接口是 /api/order/find/order_state
+    const res = await axiosClient.get(`/api/order/find/order_state`, { params });
+
+    if (res?.data?.code === 200) {
+        // 查询成功不显示全局消息，由调用处处理
+        return res.data; 
+    } else {
+        const errorMsg = res?.data?.message || `按状态查询订单失败 (State: ${orderState}, UserID: ${userId})`;
+        showFail(functionName, errorMsg);
+        throw new Error(errorMsg);
+    }
+  } catch (error) {
+    const errorMsg = error.message || `按状态查询订单时发生网络错误 (State: ${orderState}, UserID: ${userId})`;
+    showFail(functionName, errorMsg);
+    throw error;
+  }
+}

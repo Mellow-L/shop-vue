@@ -2,9 +2,9 @@
   <div class="orders-container">
     <h1 class="page-title">订单管理</h1>
     
-    <a-tabs v-model:activeKey="activeTab">
+    <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
       <a-tab-pane key="all" tab="全部订单"></a-tab-pane>
-      <a-tab-pane key="processing" tab="待发货"></a-tab-pane>
+      <a-tab-pane key="pending" tab="待发货"></a-tab-pane>
       <a-tab-pane key="shipped" tab="待收货"></a-tab-pane>
       <a-tab-pane key="completed" tab="已完成"></a-tab-pane>
       <a-tab-pane key="cancelled" tab="已取消"></a-tab-pane>
@@ -23,8 +23,17 @@
         @search="onSearch"
       />
     </div>
+
+    <div v-if="loading" class="loading-container">
+      <a-spin tip="加载订单中..." />
+    </div>
+
+    <div v-else-if="error" class="error-container">
+      <a-alert type="error" :message="error" show-icon />
+      <a-button type="primary" @click="fetchOrders" style="margin-top: 16px;">重试</a-button>
+    </div>
     
-    <div v-if="filteredOrders.length === 0" class="empty-orders">
+    <div v-else-if="filteredOrders.length === 0" class="empty-orders">
       <a-empty :description="activeTab === 'all' ? '暂无订单' : `暂无${getStatusText(activeTab)}订单`" />
     </div>
     
@@ -51,7 +60,7 @@
               <div class="order-products-list">
                  <div v-for="product in item.products" :key="product.product_id" class="order-product-item">
                    <img 
-                     :src="product.product_picture || 'https://placehold.co/80x80?text=No+Image'" 
+                     :src="getProductImage(product)" 
                      :alt="product.product_name" 
                      class="product-image-item" 
                      @click="viewProductDetail(product.product_id)"
@@ -61,20 +70,38 @@
                         {{ product.product_name }}
                      </div>
                      <div class="product-price-quantity">
-                       ¥{{ product.price.toFixed(2) }} × {{ product.quantity }}
+                       ¥{{ formatPrice(product.price) }} × {{ product.quantity }}
                      </div>
                    </div>
                     <div class="product-subtotal">
-                      ¥{{ (product.price * product.quantity).toFixed(2) }}
+                      ¥{{ formatPrice(product.price * product.quantity) }}
                     </div>
                  </div>
               </div>
               
               <div class="order-footer">
                 <div class="order-total">
-                  共 {{ getTotalItems(item) }} 件商品， 合计： <span class="total-price">¥{{ getTotalPrice(item).toFixed(2) }}</span>
+                  共 {{ getTotalItems(item) }} 件商品， 合计： <span class="total-price">¥{{ formatPrice(getTotalPrice(item)) }}</span>
                 </div>
                 <div class="order-actions">
+                  <a-button 
+                    v-if="item.order_state === 'pending'" 
+                    type="primary" 
+                    size="small" 
+                    :loading="processingOrderId === item.order_id && processingAction === 'ship'" 
+                    @click="markAsShipped(item)"
+                  >
+                    我已发货
+                  </a-button>
+                  <a-button 
+                    v-if="item.order_state === 'pending' || item.order_state === 'shipped'" 
+                    danger
+                    size="small" 
+                    :loading="processingOrderId === item.order_id && processingAction === 'cancel'" 
+                    @click="cancelOrderAdmin(item)"
+                  >
+                    取消订单
+                  </a-button>
                   <a-button size="small" @click="viewOrderDetail(item.order_id)">订单详情</a-button>
                 </div>
               </div>
@@ -90,10 +117,12 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue';
-import { message, Tabs, TabPane, InputSearch, RangePicker, List, ListItem, Card, Empty, Button } from 'ant-design-vue';
+import { ref, computed, reactive, onMounted } from 'vue';
+import { message, Tabs, TabPane, InputSearch, RangePicker, List, ListItem, Card, Empty, Button, Spin, Alert } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import dayjs from 'dayjs';
+import { apiFindAllOrders, apiMarkOrderAsShipped, apiCancelOrderByDeliver, apiFindOrdersByState } from '@/api/order';
+import apiConfig from '@/config/api';
 
 const router = useRouter();
 const activeTab = ref('all');
@@ -101,135 +130,152 @@ const searchText = ref('');
 const dateRange = ref(null);
 const detailModalVisible = ref(false);
 const selectedOrderId = ref(null);
+const orders = ref([]);
+const loading = ref(false);
+const error = ref(null);
+const processingOrderId = ref(null);
+const processingAction = ref(null);
 
-// Static data mimicking user/MyOrders.vue but with potentially more orders/users
-const orders = reactive([
-  {
-    order_id: 'ORD20240501001',
-    order_state: 'completed',
-    receiver: '张三', // Keep receiver/address? Not strictly needed for admin list view
-    address: '北京市朝阳区xxx街道xxx号',
-    user_id: 10001,
-    orderDate: '2024-05-01 14:30:25', // Use same date format as user page for consistency
-    paymentMethod: '支付宝',
-    shippingFee: 0.00,
-    products: [
-      {
-        product_id: 1,
-        product_name: 'iPhone 15 Pro Max',
-        product_picture: 'https://placehold.co/300x300?text=iPhone',
-        price: 9999,
-        quantity: 1
-      }
-    ],
-     totalAmount: 9999 // Keep for reference, but calculate dynamically if needed
-  },
-  {
-    order_id: 'ORD20240502002',
-    order_state: 'shipped',
-    receiver: '李四',
-    address: '上海市浦东新区xxx路xxx号',
-    user_id: 10002,
-    orderDate: '2024-05-02 09:45:12',
-    paymentMethod: '微信支付',
-    shippingFee: 10.00,
-    products: [
-      {
-        product_id: 3,
-        product_name: '有机水果礼盒',
-        product_picture: 'https://placehold.co/300x300?text=Fruits',
-        price: 199,
-        quantity: 2
-      },
-      {
-        product_id: 7,
-        product_name: '有机红茶',
-        product_picture: 'https://placehold.co/300x300?text=Tea',
-        price: 89,
-        quantity: 1
-      }
-    ],
-    totalAmount: 497
-  },
-  {
-    order_id: 'ORD20240503003',
-    order_state: 'cancelled',
-    receiver: '王五',
-    address: '广州市天河区xxx大道xxx号',
-    user_id: 10003,
-    orderDate: '2024-05-03 16:20:33',
-    paymentMethod: '银联',
-    shippingFee: 5.00,
-    products: [
-      {
-        product_id: 5,
-        product_name: '智能手表',
-        product_picture: 'https://placehold.co/300x300?text=Watch',
-        price: 1599,
-        quantity: 1
-      },
-      {
-        product_id: 8,
-        product_name: '数据结构与算法',
-        product_picture: 'https://placehold.co/300x300?text=Algorithm',
-        price: 99,
-        quantity: 1
-      }
-    ],
-    totalAmount: 1703
-  },
-    {
-    order_id: 'ORD20240504004',
-    order_state: 'processing',
-    receiver: '赵六',
-    address: '深圳市南山区xxx科技园',
-    user_id: 10001, // Same user as first order
-    orderDate: '2024-05-04 11:05:00',
-    paymentMethod: '微信支付',
-    shippingFee: 8.00,
-    products: [
-      {
-        product_id: 10,
-        product_name: '无线蓝牙耳机',
-        product_picture: 'https://placehold.co/300x300?text=Earbuds',
-        price: 499,
-        quantity: 1
-      }
-    ],
-    totalAmount: 507
+const getProductImage = (product) => {
+  if (!product || !product.product_picture) return 'https://placehold.co/80x80?text=No+Image';
+  
+  const relativePath = product.product_picture;
+  const baseUrl = apiConfig.BASE_URL.endsWith('/') ? apiConfig.BASE_URL : apiConfig.BASE_URL + '/';
+  const imagePath = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+  return baseUrl + imagePath;
+};
+
+const formatPrice = (price) => {
+  if (typeof price !== 'number') {
+      return '0.00';
   }
-]);
+  return price.toFixed(2);
+};
+
+const mapFrontendStateToApiState = (frontendState) => {
+  const map = {
+    pending: '待发货',
+    shipped: '已发货',
+    completed: '已完成',
+    cancelled: '已取消',
+  };
+  return map[frontendState] || frontendState;
+};
+
+const fetchOrders = async (state = null) => {
+  loading.value = true;
+  error.value = null;
+  orders.value = [];
+
+  try {
+    let res;
+    if (state && state !== 'all') {
+        const apiState = mapFrontendStateToApiState(state);
+        console.log(`Admin - Fetching orders with state: ${state} (API: ${apiState})`);
+        res = await apiFindOrdersByState(apiState);
+    } else {
+        console.log('Admin - Fetching all orders');
+        res = await apiFindAllOrders();
+    }
+
+    console.log(`Admin - API Response for orders (State: ${state || 'all'}):`, res);
+
+    if (res && res.code === 200 && Array.isArray(res.list)) {
+      const groupedOrders = {};
+      res.list.forEach(item => {
+        if (item.order_state === '购物车') {
+            console.log(`Admin - 过滤掉购物车状态的订单项: Order ID ${item.order_id}, Product ID ${item.product_id}`);
+            return; 
+        }
+
+        let internalState = 'unknown'; 
+        switch (item.order_state) {
+          case '待发货':
+              internalState = 'pending'; break; 
+          case '待收货':
+          case '已发货':
+              internalState = 'shipped'; break; 
+          case '已完成': 
+              internalState = 'completed'; break;
+          case '已取消': 
+              internalState = 'cancelled'; break;
+          default: 
+              console.warn(`Admin - 未知或非目标订单状态: ${item.order_state} for order ${item.order_id}`);
+              internalState = 'unknown';
+        }
+
+        if (['pending', 'shipped', 'completed', 'cancelled', 'unknown'].includes(internalState)) {
+            if (!groupedOrders[item.order_id]) {
+              groupedOrders[item.order_id] = {
+                order_id: item.order_id,
+                order_state: internalState,
+                user_id: item.user_id,
+                orderDate: dayjs(item.order_time).format('YYYY-MM-DD HH:mm:ss'),
+                create_time: item.order_time,
+                products: []
+              };
+            }
+            
+            if (groupedOrders[item.order_id]) {
+                groupedOrders[item.order_id].products.push({
+                  product_id: item.product_id,
+                  product_name: item.product_name,
+                  quantity: item.product_number,
+                  price: item.product_number > 0 ? (item.total_price / item.product_number) : 0, 
+                  product_picture: item.product_img || null
+                });
+            }
+        } else {
+             console.log(`Admin - 过滤掉非目标状态的订单项: Order ID ${item.order_id}, State: ${item.order_state}`);
+        }
+      });
+      
+      orders.value = Object.values(groupedOrders);
+      orders.value.sort((a, b) => dayjs(b.create_time).unix() - dayjs(a.create_time).unix());
+      console.log("Admin - 重构后的订单数据:", JSON.parse(JSON.stringify(orders.value)));
+
+    } else {
+      if (res && res.code !== 200) {
+           error.value = `获取订单失败: ${res.message || '未知错误'}`;
+       } else if (!Array.isArray(res?.list)) {
+           error.value = '获取订单失败: 返回的数据格式不正确';
+       } else {
+           console.log("Admin - 订单列表为空。");
+       }
+    }
+  } catch (err) {
+    console.error(`Admin - 获取订单失败 (State: ${state || 'all'}):`, err);
+    error.value = err.message || '获取订单数据时发生网络或未知错误';
+    orders.value = [];
+  } finally {
+    loading.value = false;
+  }
+};
 
 const filteredOrders = computed(() => {
-  let result = orders; // Use static data directly
+  let result = orders.value; 
 
-  // Filter by status tab
   if (activeTab.value !== 'all') {
     result = result.filter(order => order.order_state === activeTab.value);
   }
 
-  // Filter by date range (using orderDate)
   if (dateRange.value && dateRange.value.length === 2) {
     const [startDate, endDate] = dateRange.value;
     result = result.filter(order => {
-      const orderDate = dayjs(order.orderDate); // Use orderDate from static data
+      const orderDate = dayjs(order.create_time);
       return orderDate.isAfter(startDate.startOf('day')) && orderDate.isBefore(endDate.endOf('day'));
     });
   }
 
-  // Filter by search text (order ID, product name, user ID)
   if (searchText.value) {
     const lowerSearch = searchText.value.toLowerCase();
     result = result.filter(order => 
-      order.order_id.toLowerCase().includes(lowerSearch) ||
-      order.user_id.toString().toLowerCase().includes(lowerSearch) || // Keep user ID search
-      (order.products && order.products.some(p => p.product_name.toLowerCase().includes(lowerSearch)))
+      order.order_id.toString().toLowerCase().includes(lowerSearch) ||
+      order.user_id.toString().toLowerCase().includes(lowerSearch) ||
+      (order.products && order.products.some(p => p.product_name && p.product_name.toLowerCase().includes(lowerSearch)))
     );
   }
   
-  // Sort orders by date, newest first
-  result.sort((a, b) => dayjs(b.orderDate).unix() - dayjs(a.orderDate).unix());
-
   return result;
 });
 
@@ -237,61 +283,107 @@ const pagination = {
   onChange: page => {
     console.log('Page changed to:', page);
   },
-  pageSize: 5, // Match user page pagination for consistency
+  pageSize: 5,
 };
 
 const getStatusText = (status) => {
-  // Use the exact same map as user page
   const statusMap = {
-    'processing': '待发货',
+    'pending': '待发货', 
     'shipped': '待收货',
     'completed': '已完成',
-    'cancelled': '已取消'
+    'cancelled': '已取消',
+    'unknown': '未知状态'
   };
   return statusMap[status] || status;
 };
 
 const getTotalPrice = (order) => {
   if (!order.products) return 0;
-  return order.products.reduce((sum, product) => sum + product.price * product.quantity, 0);
+  return order.products.reduce((sum, product) => {
+      const price = typeof product.price === 'number' ? product.price : 0;
+      const quantity = typeof product.quantity === 'number' ? product.quantity : 0;
+      return sum + price * quantity;
+  }, 0);
 };
 
 const getTotalItems = (order) => {
   if (!order.products) return 0;
-  return order.products.reduce((sum, product) => sum + product.quantity, 0);
+  return order.products.reduce((sum, product) => {
+      const quantity = typeof product.quantity === 'number' ? product.quantity : 0;
+      return sum + quantity;
+  }, 0);
 };
 
 const onSearch = () => {
-  console.log('Searching for:', searchText.value);
+  console.log('Admin - Searching for:', searchText.value);
+};
+
+const handleTabChange = (newTabKey) => {
+  searchText.value = '';
+  dateRange.value = null;
+  fetchOrders(newTabKey);
+};
+
+const markAsShipped = async (orderToMark) => {
+  processingOrderId.value = orderToMark.order_id;
+  processingAction.value = 'ship';
+  try {
+    const res = await apiMarkOrderAsShipped(orderToMark.order_id);
+    if (res && res.code === 200) {
+      fetchOrders(activeTab.value);
+    } else {
+      console.error("Admin - 标记发货失败 (API Response):", res);
+    }
+  } catch (err) {
+    console.error("Admin - 标记发货失败 (Catch Block):", err);
+  } finally {
+    processingOrderId.value = null;
+    processingAction.value = null;
+  }
+};
+
+const cancelOrderAdmin = async (orderToCancel) => {
+  processingOrderId.value = orderToCancel.order_id;
+  processingAction.value = 'cancel';
+  try {
+    const res = await apiCancelOrderByDeliver(orderToCancel.order_id);
+    if (res && res.code === 200) {
+      fetchOrders(activeTab.value);
+    } else {
+      console.error('Admin - 取消订单失败 (API Response):', res);
+    }
+  } catch (error) {
+    console.error('Admin - 取消订单失败 (Catch Block):', error);
+  } finally {
+    processingOrderId.value = null;
+    processingAction.value = null;
+  }
 };
 
 const viewOrderDetail = (orderId) => {
-  console.log('跳转到订单详情页:', orderId);
-  // Option 1: Navigate to a detail page using named route
+  console.log('Admin - 跳转到订单详情页:', orderId);
   router.push({ name: 'AdminOrderDetail', params: { id: orderId } }); 
-  
-  // Option 2: Show a modal (requires an OrderDetailModal component)
-  // selectedOrderId.value = orderId;
-  // detailModalVisible.value = true;
-  
-  // message.info(`功能待实现：查看订单 ${orderId} 的详情`); // Remove placeholder message
 };
 
 const viewProductDetail = (productId) => {
-    console.log('查看商品详情:', productId);
-    message.info(`功能待实现：查看商品 ${productId} 的详情`);
+    console.log('Admin - 查看商品详情:', productId);
+    router.push(`/product/${productId}`); 
 };
+
+onMounted(() => {
+  fetchOrders(activeTab.value);
+});
 
 </script>
 
 <style scoped>
 .orders-container {
   padding: 24px;
-  background-color: #fff; /* Changed back to white like user page */
+  background-color: #fff;
 }
 
 .page-title {
-  font-size: 20px; /* Matched user page font size */
+  font-size: 20px;
   font-weight: 500;
   margin-bottom: 16px;
   color: rgba(0, 0, 0, 0.85);
@@ -299,35 +391,37 @@ const viewProductDetail = (productId) => {
 
 .orders-search {
   margin-bottom: 20px;
-  /* Removed background/shadow to match user page */
-  /* padding: 16px; */ 
-  /* background-color: #fff; */
-  /* border-radius: 4px; */
-  /* box-shadow: 0 1px 3px rgba(0,0,0,0.1); */
   display: flex;
   align-items: center;
 }
 
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 40px 0;
+}
+
 .empty-orders {
   text-align: center;
-  padding: 40px 0; /* Adjusted padding */
-  /* Removed background/shadow/border */
+  padding: 40px 0;
 }
 
 .orders-list {
-  margin-top: 0; /* Adjusted margin */
+  margin-top: 0;
 }
 
 .order-card {
   margin-bottom: 16px;
-  border: 1px solid #e8e8e8; /* Added border like user page */
-  border-radius: 2px; /* Matched user page border-radius */
-  /* Removed box-shadow */
+  border: 1px solid #e8e8e8;
+  border-radius: 2px;
   transition: box-shadow 0.3s ease;
 }
 
 .order-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09); /* Matched user page hover shadow */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
 }
 
 .order-header {
@@ -337,8 +431,8 @@ const viewProductDetail = (productId) => {
   background-color: #fafafa;
   padding: 12px 16px;
   border-bottom: 1px solid #e8e8e8;
-  font-size: 14px; /* Matched user page */
-  color: rgba(0, 0, 0, 0.65); /* Matched user page */
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
 }
 
 .order-info span {
@@ -347,37 +441,35 @@ const viewProductDetail = (productId) => {
 
 .order-number {
   font-weight: 500;
-  color: rgba(0, 0, 0, 0.85); /* Matched user page */
+  color: rgba(0, 0, 0, 0.85);
 }
 
-/* Added styles for user ID to differentiate */
 .order-user {
-    font-style: normal; /* Keep it standard */
-    color: #888; /* Lighter color for less emphasis */
+    font-style: normal;
+    color: #888;
     font-size: 13px;
 }
 
 .order-status {
-  font-weight: normal; /* Matched user page */
-  /* Removed padding/border/font-size/text-transform defined below */
+  font-weight: normal;
 }
 
-/* Status colors - kept admin version as they are more distinct */
-.status-processing { color: #faad14; }
+.status-pending { color: #faad14; }
 .status-shipped { color: #1890ff; }
 .status-completed { color: #52c41a; }
-.status-cancelled { color: #f5222d; }
+.status-cancelled { color: #bfbfbf; }
+.status-unknown { color: #888; }
 
 .order-products-list {
-  padding: 16px; /* Matched user page padding */
+  padding: 16px;
 }
 
 .order-product-item {
   display: flex;
   align-items: center;
-  margin-bottom: 16px; /* Matched user page */
-  padding-bottom: 16px; /* Matched user page */
-  border-bottom: 1px solid #e8e8e8; /* Matched user page */
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e8e8e8;
 }
 .order-product-item:last-child {
   margin-bottom: 0;
@@ -386,13 +478,12 @@ const viewProductDetail = (productId) => {
 }
 
 .product-image-item {
-  width: 80px; /* Matched user page */
-  height: 80px; /* Matched user page */
+  width: 80px;
+  height: 80px;
   object-fit: cover;
-  margin-right: 16px; /* Matched user page */
-  border-radius: 2px; /* Matched user page */
+  margin-right: 16px;
+  border-radius: 2px;
   cursor: pointer;
-  /* border: 1px solid #eee; */ /* Removed border */
 }
 
 .product-details {
@@ -401,10 +492,10 @@ const viewProductDetail = (productId) => {
 }
 
 .product-name-item {
-  font-weight: normal; /* Matched user page */
+  font-weight: normal;
   margin-bottom: 4px;
   cursor: pointer;
-  color: rgba(0, 0, 0, 0.85); /* Matched user page */
+  color: rgba(0, 0, 0, 0.85);
   transition: color 0.3s;
 }
 .product-name-item:hover {
@@ -412,45 +503,41 @@ const viewProductDetail = (productId) => {
 }
 
 .product-price-quantity {
-  color: rgba(0, 0, 0, 0.65); /* Matched user page */
-  font-size: 14px; /* Matched user page */
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 14px;
 }
 
 .product-subtotal {
-    font-weight: normal; /* Matched user page */
-    color: rgba(0, 0, 0, 0.85); /* Matched user page */
+    font-weight: normal;
+    color: rgba(0, 0, 0, 0.85);
     min-width: 80px;
     text-align: right;
-    font-size: 14px; /* Added for consistency */
+    font-size: 14px;
 }
 
 .order-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px; /* Matched user page */
+  padding: 12px 16px;
   border-top: 1px solid #e8e8e8;
 }
 
 .order-total {
   font-size: 14px;
-  color: rgba(0, 0, 0, 0.85); /* Matched user page */
+  color: rgba(0, 0, 0, 0.85);
 }
 
 .total-price {
   font-size: 16px;
   font-weight: bold;
-  color: #ff4d4f; /* Matched user page price color */
+  color: #ff4d4f;
 }
 
 .order-actions .ant-btn {
   margin-left: 8px;
 }
-
-/* Removed RangePicker width override */
-/* :deep(.ant-picker) { */
-/*   width: 300px !important; */ 
-/* } */
 </style>
   
   
+

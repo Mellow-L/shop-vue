@@ -110,7 +110,7 @@ import { ref, computed, reactive, onMounted } from 'vue';
 import { message, Spin, Empty, Button as AButton, Select as ASelect, InputSearch as AInputSearch, SelectOption as ASelectOption, Tag as ATag, CardMeta as ACardMeta, Card as ACard, Row as ARow, Col as ACol, List as AList, Tabs as ATabs, TabPane as ATabPane, RangePicker as ARangePicker, Alert as AAlert } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import dayjs from 'dayjs';
-import { apiFindOrdersByUserId, apiUpdateOrderStatus, apiDeleteOrder } from '@/api/order';
+import { apiFindOrdersByUserId, apiUpdateOrderStatus, apiCancelOrderByDeliver, apiFindOrdersByState, apiConfirmReceiptByDeliver } from '@/api/order';
 import apiConfig from '@/config/api';
 
 const router = useRouter();
@@ -156,50 +156,64 @@ const formatPrice = (price) => {
   return parseFloat(price).toFixed(2);
 };
 
+// 新增：状态反向映射 (给 API 使用)
+const mapFrontendStateToApiState = (frontendState) => {
+  const map = {
+    pending: '待发货', // 假设 API 期望中文
+    shipped: '已发货',
+    completed: '已完成',
+    cancelled: '已取消',
+  };
+  return map[frontendState] || frontendState; // 如果没匹配到，返回原始值
+};
+
 // 获取用户订单
-const fetchUserOrders = async () => {
+const fetchUserOrders = async (state = null) => {
   const userId = getUserIdFromStorage();
   if (!userId) {
     error.value = '无法获取用户ID，请重新登录';
+    loading.value = false; // 确保设置 loading 为 false
     return;
   }
   
   loading.value = true;
   error.value = null;
-  orders.value = []; // Clear previous orders
+  orders.value = []; 
   
   try {
-    const res = await apiFindOrdersByUserId(userId);
-    console.log("API Response for orders:", res); // Log API response
+    let res;
+    if (state && state !== 'all') {
+      const apiState = mapFrontendStateToApiState(state);
+      console.log(`Fetching orders for user ${userId} with state: ${state} (API: ${apiState})`);
+      res = await apiFindOrdersByState(apiState, userId);
+    } else {
+      console.log(`Fetching all orders for user ${userId}`);
+      res = await apiFindOrdersByUserId(userId);
+    }
 
-    // 检查 res.code 和 res.list
+    console.log(`API Response for orders (State: ${state || 'all'}):`, res);
+
     if (res && res.code === 200 && Array.isArray(res.list)) {
       const groupedOrders = {};
       res.list.forEach(item => {
-        // 过滤掉 '购物车' 状态的项
         if (item.order_state === '购物车') {
-            console.log(`过滤掉购物车状态的订单项: Order ID ${item.order_id}, Product ID ${item.product_id}`);
             return; 
         }
-
-        // 映射 API 状态到内部状态键 (需要根据实际 API 返回调整)
         let internalState = 'unknown'; 
         switch (item.order_state) {
-          case '待发货': 
-          case '已支付': 
+          case '待发货':
               internalState = 'pending'; break; 
-          case '已发货': 
+          case '待收货':
+          case '已发货':
               internalState = 'shipped'; break; 
           case '已完成': 
               internalState = 'completed'; break;
           case '已取消': 
               internalState = 'cancelled'; break;
           default: 
-              console.warn(`未知的订单状态: ${item.order_state} for order ${item.order_id}`);
-              internalState = item.order_state; // 保留原始状态以防万一
+              console.warn(`Admin - 未知或非目标订单状态: ${item.order_state} for order ${item.order_id}`);
+              internalState = 'unknown';
         }
-
-        // 如果订单还未添加到 groupedOrders，则创建
         if (!groupedOrders[item.order_id]) {
           groupedOrders[item.order_id] = {
             order_id: item.order_id,
@@ -212,8 +226,6 @@ const fetchUserOrders = async () => {
             products: [] // 初始化 products 数组
           };
         }
-        
-        // 将当前项作为产品添加到对应订单的 products 数组中
         groupedOrders[item.order_id].products.push({
           product_id: item.product_id,
           product_name: item.product_name,
@@ -226,18 +238,8 @@ const fetchUserOrders = async () => {
           product_picture: item.product_img || null // 使用 API 返回的 product_img
         });
       });
-      
       orders.value = Object.values(groupedOrders);
-      console.log("重构后的订单数据 (排序前):", JSON.parse(JSON.stringify(orders.value))); // Log a copy before sorting
-
-      // *** 添加排序逻辑：按 create_time 降序排列 (从新到旧) ***
-      orders.value.sort((a, b) => {
-          // 确保 create_time 存在且是有效日期字符串
-          const dateA = a.create_time ? new Date(a.create_time) : new Date(0); // Default to epoch if invalid
-          const dateB = b.create_time ? new Date(b.create_time) : new Date(0);
-          return dateB - dateA; // Date 对象比较更可靠
-      });
-      console.log("重构后的订单数据 (排序后):", JSON.parse(JSON.stringify(orders.value))); // Log a copy after sorting
+      orders.value.sort((a, b) => dayjs(b.create_time).unix() - dayjs(a.create_time).unix());
 
       if (orders.value.length === 0 && res.list.length > 0) {
           console.warn("API返回了数据，但过滤/重构后订单列表为空。可能所有订单都是'购物车'状态或其他未处理状态。")
@@ -260,36 +262,31 @@ const fetchUserOrders = async () => {
        orders.value = []; // 确保在出错或无数据时清空
     }
   } catch (err) {
-    console.error('获取订单失败 (catch block):', err);
+    console.error(`获取订单失败 (State: ${state || 'all'}):`, err);
     error.value = err.message || '获取订单数据时发生网络或未知错误';
+    orders.value = [];
   } finally {
     loading.value = false;
   }
 };
 
-// 过滤订单
+// 修改：移除前端状态过滤
 const filteredOrders = computed(() => {
-  let result = orders.value;
+  let result = orders.value; // 直接使用 API 返回的结果
   
-  // 按状态过滤
-  if (activeTab.value !== 'all') {
-    result = result.filter(order => order.order_state === activeTab.value);
-  }
-  
-  // 按搜索文本过滤
+  // 保留搜索文本过滤
   if (searchText.value) {
     const lowerSearch = searchText.value.toLowerCase();
     result = result.filter(order => 
-      order.order_id.toLowerCase().includes(lowerSearch) ||
-      order.products.some(p => p.product_name.toLowerCase().includes(lowerSearch))
+      order.order_id.toString().toLowerCase().includes(lowerSearch) || // 确保是字符串
+      order.products.some(p => p.product_name && p.product_name.toLowerCase().includes(lowerSearch))
     );
   }
   
-  // 按日期范围过滤
+  // 保留日期范围过滤
   if (dateRange.value && dateRange.value[0] && dateRange.value[1]) {
     const startDate = dateRange.value[0].startOf('day');
     const endDate = dateRange.value[1].endOf('day');
-    
     result = result.filter(order => {
       const orderDate = dayjs(order.create_time);
       return orderDate.isAfter(startDate) && orderDate.isBefore(endDate);
@@ -325,10 +322,11 @@ const getTotalPrice = (order) => {
   return order.products.reduce((sum, product) => sum + product.price * product.quantity, 0);
 };
 
-const handleTabChange = () => {
-  // 标签页变化时重置搜索和日期
+// 修改：Tab 切换时调用 fetchUserOrders 并传入状态
+const handleTabChange = (newTabKey) => {
   searchText.value = '';
   dateRange.value = null;
+  fetchUserOrders(newTabKey); // 使用新的 Tab key 作为状态参数
 };
 
 const onSearch = (value) => {
@@ -347,15 +345,15 @@ const cancelOrder = async (orderToCancel) => {
   processingOrderId.value = orderToCancel.order_id;
   
   try {
-    // 使用 apiDeleteOrder 函数来删除订单
-    const res = await apiDeleteOrder(orderToCancel.order_id);
+    // 调用新的取消订单API (通过 deliver 接口)
+    const res = await apiCancelOrderByDeliver(orderToCancel.order_id);
     
     if (res && res.code === 200) {
-      // 订单删除成功 (消息已由 API 函数显示)
+      // 订单取消成功 (消息已由 API 函数显示)
       // 重新获取订单列表以更新界面
       fetchUserOrders();
     } else {
-      // 删除失败 (消息已由 API 函数显示)
+      // 取消失败 (消息已由 API 函数显示)
       console.error('取消订单失败 (API Response in MyOrders):', res);
     }
   } catch (error) {
@@ -366,27 +364,22 @@ const cancelOrder = async (orderToCancel) => {
   }
 };
 
-// 确认收货
+// 修改：确认收货，调用新的 API
 const confirmReceipt = async (orderToConfirm) => {
   processingOrderId.value = orderToConfirm.order_id;
-  
   try {
-    const formData = new FormData();
-    formData.append('order_id', orderToConfirm.order_id);
-    formData.append('state', 'completed');
-    
-    const res = await apiUpdateOrderStatus(formData);
+    // 调用新的确认收货 API (通过 deliver 接口)
+    const res = await apiConfirmReceiptByDeliver(orderToConfirm.order_id);
     
     if (res && res.code === 200) {
-      // 更新本地订单状态
-      const orderIndex = orders.value.findIndex(o => o.order_id === orderToConfirm.order_id);
-      if (orderIndex !== -1) {
-        orders.value[orderIndex].order_state = 'completed';
-      }
+      // 更新成功 (消息已由 API 函数显示)
+      fetchUserOrders(activeTab.value); // 刷新当前 Tab 的列表
     } else {
+      // 更新失败 (消息已由 API 函数显示)
       console.error('确认收货失败 (API Response in MyOrders):', res);
     }
   } catch (error) {
+    // 网络错误或其他 (消息已由 API 函数显示)
     console.error('确认收货失败 (Catch Block in MyOrders):', error);
   } finally {
     processingOrderId.value = null;
@@ -428,9 +421,9 @@ const viewProductDetail = (productId) => {
     router.push(`/product/${productId}`);
 };
 
-// 组件挂载时获取订单数据
+// 修改：onMounted 时调用 fetchUserOrders (默认获取 all)
 onMounted(() => {
-  fetchUserOrders();
+  fetchUserOrders(activeTab.value); // 初始加载时也传入当前激活的 tab key
 });
 </script>
 

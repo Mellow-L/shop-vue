@@ -12,7 +12,7 @@ export const axiosClient = axios.create({
 export async function apiAddOrder(orderJsonData) {
   try {
     // 直接发送 JS 对象，Axios 会自动处理为 application/json
-    const res = await axios.post('/api/order/add/order', orderJsonData); 
+    const res = await axiosClient.post('/api/order/add/order', orderJsonData);
     if (res?.data?.code === 200) {
         showSuccess(apiAddOrder.name, "订单添加成功");
         return res.data;
@@ -33,7 +33,7 @@ export async function apiDeleteCartItem(productId, userId) {
     formData.append('product_id', productId);
     formData.append('user_id', userId);
     
-    const res = await axios.delete('/api/order/delete/double_id', {
+    const res = await axiosClient.delete('/api/order/delete/double_id', {
       data: formData
     });
     if (res?.data?.code === 200) {
@@ -57,7 +57,7 @@ export async function apiUpdateOrderQuantity(productId, userId, quantity) {
     formData.append('user_id', userId);
     formData.append('product_number', quantity);
     
-    const res = await axios.put('/api/order/update/product_id', formData);
+    const res = await axiosClient.put('/api/order/update/product_id', formData);
     if (res?.data?.code === 200) {
         showSuccess(apiUpdateOrderQuantity.name, "订单数量更新成功");
         return res.data;
@@ -82,7 +82,7 @@ export async function apiUpdateOrderStatus(formData) {
       formData = newFormData;
     }
     
-    const res = await axios.put('/api/order/update/state', formData);
+    const res = await axiosClient.put('/api/order/update/state', formData);
     if (res?.data?.code === 200) {
         showSuccess(apiUpdateOrderStatus.name, "订单状态更新成功");
         return res.data;
@@ -99,7 +99,7 @@ export async function apiUpdateOrderStatus(formData) {
 // 订单查询
 export async function apiFindOrderById(orderId) {
   try {
-    const res = await axios.get(`/api/order/find-byorderid?order_id=${orderId}`);
+    const res = await axiosClient.get(`/api/order/find-byorderid?order_id=${orderId}`);
     if (res?.data?.code === 200) {
         return res.data;
     } else {
@@ -114,7 +114,7 @@ export async function apiFindOrderById(orderId) {
 
 export async function apiFindAllOrders() {
   try {
-    const res = await axios.get('/api/order/find-all');
+    const res = await axiosClient.get('/api/order/find-all');
     if (res?.data?.code === 200) {
         return res.data;
     } else {
@@ -133,7 +133,7 @@ export async function apiDeleteOrder(orderId) {
     const formData = new FormData();
     formData.append('order_id', orderId);
     
-    const res = await axios.delete('/api/order/delete/order_id', {
+    const res = await axiosClient.delete('/api/order/delete/order_id', {
       data: formData
     });
     if (res?.data?.code === 200) {
@@ -151,7 +151,7 @@ export async function apiDeleteOrder(orderId) {
 
 export async function apiFindOrdersByUserId(userId) {
   try {
-    const res = await axios.get(`/api/order/find-byuserid?user_id=${userId}`);
+    const res = await axiosClient.get(`/api/order/find-byuserid?user_id=${userId}`);
     if (res?.data?.code === 200) {
         return res.data;
     } else {
@@ -170,7 +170,7 @@ export async function apiUpdateOrderAddress(orderId, address) {
     formData.append('order_id', orderId);
     formData.append('address', address);
     
-    const res = await axios.put('/api/order/update/address', formData);
+    const res = await axiosClient.put('/api/order/update/address', formData);
     if (res?.data?.code === 200) {
         showSuccess(apiUpdateOrderAddress.name, "订单地址更新成功");
         return res.data;

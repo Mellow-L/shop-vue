@@ -347,22 +347,19 @@ const cancelOrder = async (orderToCancel) => {
   processingOrderId.value = orderToCancel.order_id;
   
   try {
-    const formData = new FormData();
-    formData.append('order_id', orderToCancel.order_id);
-    formData.append('state', 'cancelled');
-    
-    const res = await apiUpdateOrderStatus(formData);
+    // 使用 apiDeleteOrder 函数来删除订单
+    const res = await apiDeleteOrder(orderToCancel.order_id);
     
     if (res && res.code === 200) {
-      // 更新本地订单状态
-      const orderIndex = orders.value.findIndex(o => o.order_id === orderToCancel.order_id);
-      if (orderIndex !== -1) {
-        orders.value[orderIndex].order_state = 'cancelled';
-      }
+      // 订单删除成功 (消息已由 API 函数显示)
+      // 重新获取订单列表以更新界面
+      fetchUserOrders();
     } else {
+      // 删除失败 (消息已由 API 函数显示)
       console.error('取消订单失败 (API Response in MyOrders):', res);
     }
   } catch (error) {
+    // 网络错误或其他错误 (消息已由 API 函数显示)
     console.error('取消订单失败 (Catch Block in MyOrders):', error);
   } finally {
     processingOrderId.value = null;

@@ -1,407 +1,408 @@
 <template>
-  <div class="order-detail-container" v-if="order">
-    <a-breadcrumb class="breadcrumb">
-      <a-breadcrumb-item>
-        <router-link to="/admin/dashboard">管理后台</router-link>
-      </a-breadcrumb-item>
-      <a-breadcrumb-item>
-        <router-link to="/admin/orders">订单管理</router-link>
-      </a-breadcrumb-item>
-      <a-breadcrumb-item>订单详情管理</a-breadcrumb-item>
-    </a-breadcrumb>
+  <!-- Loading State (from OrderDetail.vue) -->
+  <div v-if="loading" class="loading-state">
+    <a-spin size="large" tip="加载订单详情中..." />
+  </div>
 
+  <!-- Error State (from OrderDetail.vue) -->
+  <div v-else-if="error" class="error-state">
+     <a-alert
+      message="加载订单失败"
+      :description="error"
+      type="error"
+      show-icon
+    >
+      <template #action>
+        <!-- Pass orderId ref to fetch function -->
+        <a-button type="primary" @click="fetchOrderDetail(orderId)">重试</a-button>
+        <a-button @click="goBack" style="margin-left: 8px">返回列表</a-button>
+      </template>
+    </a-alert>
+  </div>
+
+  <!-- Order Detail Content (structure from OrderDetail.vue) -->
+  <div v-else-if="order" class="order-detail-container">
+    <!-- Page Header (adapted from OrderDetail.vue) -->
+    <a-page-header
+      class="site-page-header"
+      :title="`订单详情管理 (ID: ${order.order_id})`" 
+      @back="goBack"
+    >
+       <template #breadcrumb>
+          <a-breadcrumb>
+            <a-breadcrumb-item>
+              <router-link to="/admin/dashboard">管理后台</router-link>
+            </a-breadcrumb-item>
+            <a-breadcrumb-item>
+              <router-link to="/admin/orders">订单管理</router-link>
+            </a-breadcrumb-item>
+            <a-breadcrumb-item>订单详情</a-breadcrumb-item>
+          </a-breadcrumb>
+       </template>
+       <template #tags>
+         <a-tag :color="getStatusColor(order.order_state)">{{ getStatusText(order.order_state) }}</a-tag>
+       </template>
+    </a-page-header>
+
+    <!-- Order Info Card (structure from OrderDetail.vue) -->
     <a-card title="订单信息" style="margin-bottom: 24px;">
-      <a-descriptions bordered :column="{ xxl: 3, xl: 2, lg: 2, md: 2, sm: 1, xs: 1 }" layout="vertical">
-        <a-descriptions-item label="订单号" :span="1">{{ order.order_id }}</a-descriptions-item>
-        <a-descriptions-item label="订单状态" :span="1">
-           <a-select v-model:value="editableOrderState" style="width: 120px" v-if="isEditing">
-            <a-select-option value="processing">待发货</a-select-option>
-            <a-select-option value="shipped">待收货</a-select-option>
-            <a-select-option value="completed">已完成</a-select-option>
-            <a-select-option value="cancelled">已取消</a-select-option>
-           </a-select>
-           <a-tag :color="getStatusColor(order.order_state)" v-else>{{ getStatusText(order.order_state) }}</a-tag>
+      <a-descriptions bordered :column="{ xxl: 3, xl: 2, lg: 2, md: 2, sm: 1, xs: 1 }">
+        <a-descriptions-item label="订单号">{{ order.order_id }}</a-descriptions-item>
+        <a-descriptions-item label="订单状态">
+          <a-tag :color="getStatusColor(order.order_state)">{{ getStatusText(order.order_state) }}</a-tag>
         </a-descriptions-item>
-        <a-descriptions-item label="订单总额" :span="{ xxl: 1, xl: 2, lg: 2, md: 2, sm: 1, xs: 1 }" class="total-amount-desc">
-          <span class="total-amount-value">¥{{ order.totalAmount.toFixed(2) }}</span>
+        <a-descriptions-item label="下单时间">{{ formatDateTime(order.order_time) }}</a-descriptions-item>
+        <a-descriptions-item label="商品总数">{{ getTotalItems(order) }} 件</a-descriptions-item>
+        <a-descriptions-item label="订单总额">
+          <span class="total-amount-value">¥{{ formatPrice(order.total_price) }}</span>
         </a-descriptions-item>
-        <a-descriptions-item label="商品总数" :span="1">{{ getTotalItems(order) }} 件</a-descriptions-item>
-        <a-descriptions-item label="下单时间" :span="1">{{ order.orderDate }}</a-descriptions-item>
-        <a-descriptions-item label="用户ID" :span="1">{{ order.user_id }}</a-descriptions-item>
-        <a-descriptions-item label="用户邮箱" :span="{ xxl: 2, xl: 1, lg: 1, md: 1, sm: 1, xs: 1 }">
-            <a-input v-model:value="editableUserEmail" v-if="isEditing" placeholder="用户邮箱"/>
-            <span v-else>{{ order.userEmail || 'N/A' }}</span>
-        </a-descriptions-item>
-        <a-descriptions-item label="收货人" :span="1">
-            <a-input v-model:value="editableReceiver" v-if="isEditing" placeholder="收货人姓名"/>
-            <span v-else>{{ order.receiver }}</span>
-        </a-descriptions-item>
-        <a-descriptions-item label="收货地址" :span="{ xxl: 3, xl: 2, lg: 2, md: 2, sm: 1, xs: 1 }">
-            <a-textarea v-model:value="editableAddress" v-if="isEditing" placeholder="详细收货地址" :rows="2"/>
-            <span v-else>{{ order.address }}</span>
-        </a-descriptions-item>
+        <a-descriptions-item label="用户ID">{{ order.user_id }}</a-descriptions-item>
+        <a-descriptions-item label="收货人">{{ parsedRecipientName }}</a-descriptions-item>
+        <a-descriptions-item label="联系邮箱">{{ parsedRecipientEmail }}</a-descriptions-item>
+        <a-descriptions-item label="收货地址" :span="{ xxl: 3, xl: 3, lg: 3, md: 3, sm: 1, xs: 1 }">{{ parsedFullAddress }}</a-descriptions-item>
       </a-descriptions>
     </a-card>
 
+    <!-- Product List Card (structure from OrderDetail.vue) -->
     <a-card title="商品列表" style="margin-bottom: 24px;">
       <a-table
-        :dataSource="order.products"
+        :dataSource="orderProductDisplayList" 
         :columns="productColumns"
         :pagination="false"
-        rowKey="product_id"
+        rowKey="product_id" 
         :scroll="{ x: 600 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'product_picture'">
-            <img :src="record.product_picture || 'https://placehold.co/80x80?text=No+Image'" :alt="record.product_name" class="product-image" />
-          </template>
-          <template v-else-if="column.key === 'product_id'">
-             <span>{{ record.product_id }}</span>
+             <img :src="getImageUrl(record.product_picture)" :alt="record.product_name" class="product-image" />
           </template>
           <template v-else-if="column.key === 'product_name'">
             <router-link :to="`/product/${record.product_id}`" target="_blank">{{ record.product_name }}</router-link>
           </template>
           <template v-else-if="column.key === 'price'">
-            <span class="price">¥{{ record.price.toFixed(2) }}</span> 
+            <span class="price">¥{{ formatPrice(record.price) }}</span>
           </template>
           <template v-else-if="column.key === 'quantity'">
-            <span>× {{ record.quantity }}</span> 
+            <span>× {{ record.quantity }}</span>
           </template>
           <template v-else-if="column.key === 'subtotal'">
-            <span class="subtotal">¥{{ (record.price * record.quantity).toFixed(2) }}</span> 
+            <span class="subtotal">¥{{ formatPrice(record.subtotal) }}</span>
           </template>
         </template>
       </a-table>
     </a-card>
 
+    <!-- Admin Actions Footer (modified from previous version) -->
     <div class="admin-actions-footer">
       <a-space :size="12">
-        <template v-if="!isEditing">
-           <a-button 
-              v-if="order.order_state === 'processing'" 
-              type="primary" 
-              @click="shipOrder(order)"
-              :disabled="!canShip(order)"
-            >
-               <SendOutlined /> 发货
-            </a-button>
-            <a-popconfirm
+          <!-- 我已发货 按钮 (仅 pending 状态) -->
+          <a-button
+            v-if="order.order_state === 'pending'"
+            type="primary"
+            :loading="processingOrderId === order.order_id && processingAction === 'ship'"
+            @click="markAsShipped(order)"
+            :disabled="processingOrderId !== null"
+          >
+             <SendOutlined /> 发货
+          </a-button>
+          <!-- 取消订单 按钮 (仅 pending 或 shipped 状态) -->
+           <a-popconfirm
                 title="确定要取消这个订单吗？"
                 ok-text="确定取消"
                 cancel-text="再想想"
                 @confirm="cancelOrderAdmin(order)"
-                :disabled="!canCancel(order)"
+                :disabled="processingOrderId !== null || !(order.order_state === 'pending' || order.order_state === 'shipped')"
             >
-                <a-button 
-                  danger 
-                  :disabled="!canCancel(order)"
+                <a-button
+                  danger
+                  :loading="processingOrderId === order.order_id && processingAction === 'cancel'"
+                  :disabled="processingOrderId !== null || !(order.order_state === 'pending' || order.order_state === 'shipped')"
                 >
                   <CloseCircleOutlined /> 取消订单
                 </a-button>
             </a-popconfirm>
-            <a-button @click="toggleEdit(true)"><EditOutlined /> 修改订单</a-button>
-        </template>
-        <template v-else>
-            <a-button @click="undoChanges">
-                <RollbackOutlined /> 撤销修改
-            </a-button>
-            <a-button type="primary" @click="confirmChanges">
-                <CheckCircleOutlined /> 确认修改
-            </a-button>
-        </template>
-        <a-button @click="$router.push('/admin/orders')">返回订单列表</a-button>
+        <a-button @click="goBack">返回订单列表</a-button>
       </a-space>
     </div>
 
   </div>
-  <div v-else class="loading-state">
-    <a-spin size="large" tip="加载订单详情中..." />
+
+   <!-- Not Found State (from OrderDetail.vue) -->
+   <div v-else class="not-found-state">
+     <a-empty description="未找到该订单信息" />
+     <a-button @click="goBack">返回订单列表</a-button>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { message, Popconfirm, Select, SelectOption, Input, Textarea } from 'ant-design-vue';
-import { SendOutlined, CloseCircleOutlined, EditOutlined, RollbackOutlined, CheckCircleOutlined } from '@ant-design/icons-vue';
-// Assume API functions for admin exist
-// import { apiAdminFindOrderById, apiAdminUpdateOrder, apiAdminCancelOrder, apiAdminShipOrder } from '@/api/admin/order'; 
-// import { apiFindUserById } from '@/api/user'; // To fetch user details
+// Import necessary Ant Design components (merged from both files)
+import { message, Spin, Alert, Breadcrumb, BreadcrumbItem, Card, Descriptions, DescriptionsItem, Tag, Table, Empty, Button, PageHeader, Space, Popconfirm } from 'ant-design-vue';
+import { SendOutlined, CloseCircleOutlined } from '@ant-design/icons-vue';
+// Import necessary API functions
+import { apiFindOrderById, apiMarkOrderAsShipped, apiCancelOrderByDeliver } from '@/api/order';
+import apiConfig from '@/config/api';
+import dayjs from 'dayjs';
 
 const route = useRoute();
 const router = useRouter();
-const order = ref(null); // Original order data
-const isEditing = ref(false);
 
-// Editable fields refs
-const editableOrderState = ref('');
-const editableUserEmail = ref(''); // Assuming admin can edit user email (unlikely, maybe just display)
-const editableReceiver = ref('');
-const editableAddress = ref('');
+// State Refs (from OrderDetail.vue + admin action refs)
+const order = ref(null);
+const orderProductDisplayList = ref([]);
+const loading = ref(true);
+const error = ref(null);
+const orderId = ref(route.params.id);
+const processingOrderId = ref(null); // For loading state on buttons
+const processingAction = ref(null);  // To distinguish ship/cancel loading
 
+// Computed properties for parsing address (from OrderDetail.vue)
+const parsedRecipientName = computed(() => {
+    if (!order.value || !order.value.address || typeof order.value.address !== 'string') return 'N/A';
+    const parts = order.value.address.split(',');
+    return parts[0]?.trim() || 'N/A';
+});
+const parsedRecipientEmail = computed(() => {
+    if (!order.value || !order.value.address || typeof order.value.address !== 'string') return 'N/A';
+    const parts = order.value.address.split(',');
+    return parts.length > 1 ? (parts[1]?.trim() || 'N/A') : 'N/A';
+});
+const parsedFullAddress = computed(() => {
+    if (!order.value || !order.value.address || typeof order.value.address !== 'string') return 'N/A';
+    const parts = order.value.address.split(',');
+    return parts.length > 2 ? (parts.slice(2).join(',').trim() || 'N/A') : 'N/A';
+});
+
+// Product Table Columns (from OrderDetail.vue)
 const productColumns = [
-  { title: '商品', key: 'product_picture', width: 80 }, 
-  { title: '商品名称', dataIndex: 'product_name', key: 'product_name', ellipsis: true }, 
-  { title: '商品ID', dataIndex: 'product_id', key: 'product_id', width: 100, align: 'center' }, 
+  { title: '商品图片', key: 'product_picture', width: 80 },
+  { title: '商品名称', dataIndex: 'product_name', key: 'product_name', ellipsis: true },
+  { title: '商品ID', dataIndex: 'product_id', key: 'product_id', width: 100, align: 'right' },
   { title: '单价', key: 'price', width: 100, align: 'right' },
-  { title: '数量', key: 'quantity', width: 80, align: 'center' }, 
+  { title: '数量', key: 'quantity', width: 80, align: 'center' },
   { title: '小计', key: 'subtotal', width: 120, align: 'right' },
 ];
 
-// --- Static Data Fetching (Replace with API call) ---
-const fetchOrderDetail = async (orderId) => {
-  console.log('[Admin Detail] Attempting to fetch order detail for ID:', orderId);
-  await new Promise(resolve => setTimeout(resolve, 500)); 
-  const mockOrders = {
-    'ORD20240501001': {
-      order_id: 'ORD20240501001',
-      user_id: 10001,
-      userEmail: 'user1@example.com',
-      order_state: 'completed',
-      orderDate: '2024-05-01 14:30:25', 
-      receiver: '张三',
-      address: '北京市朝阳区xxx街道xxx号',
-      products: [
-        {
-          product_id: 1,
-          product_name: 'iPhone 15 Pro Max Extra Long Name For Testing Ellipsis',
-          price: 9999,
-          quantity: 1,
-          product_picture: 'https://placehold.co/300x300?text=iPhone'
-        }
-      ],
-      totalAmount: 9999,
-    },
-    'ORD20240502002': {
-      order_id: 'ORD20240502002',
-      user_id: 10002,
-      userEmail: 'user2@example.com',
-      order_state: 'shipped',
-      orderDate: '2024-05-02 09:45:12',
-      receiver: '李四',
-      address: '上海市浦东新区xxx路xxx号',
-      products: [
-        {
-          product_id: 3,
-          product_name: '有机水果礼盒',
-          price: 199,
-          quantity: 2,
-          product_picture: 'https://placehold.co/300x300?text=Fruits'
-        },
-        {
-          product_id: 7,
-          product_name: '有机红茶',
-          price: 89,
-          quantity: 1,
-          product_picture: 'https://placehold.co/300x300?text=Tea'
-        }
-      ],
-      totalAmount: 487,
-    },
-     'ORD20240503003': {
-      order_id: 'ORD20240503003',
-      user_id: 10003,
-      userEmail: 'user3@example.com',
-      order_state: 'cancelled',
-      orderDate: '2024-05-03 16:20:33',
-      receiver: '王五',
-      address: '广州市天河区xxx大道xxx号',
-      products: [
-        { product_id: 5, product_name: '智能手表', price: 1599, quantity: 1, product_picture: 'https://placehold.co/300x300?text=Watch' },
-        { product_id: 8, product_name: '数据结构与算法', price: 99, quantity: 1, product_picture: 'https://placehold.co/300x300?text=Algorithm' }
-      ],
-      totalAmount: 1698,
-    },
-    'ORD20240504004': {
-      order_id: 'ORD20240504004',
-      user_id: 10001,
-      userEmail: 'user1@example.com',
-      order_state: 'processing',
-      orderDate: '2024-05-04 11:05:00',
-      receiver: '赵六',
-      address: '深圳市南山区xxx科技园',
-      products: [
-        { product_id: 10, product_name: '无线蓝牙耳机', price: 499, quantity: 1, product_picture: 'https://placehold.co/300x300?text=Earbuds' }
-      ],
-      totalAmount: 507
+// Fetch Order Detail (adapted from previous OrderDetailManage version)
+const fetchOrderDetail = async (id) => {
+  if (!id) {
+    error.value = "无效的订单ID";
+    loading.value = false;
+    return;
+  }
+  loading.value = true;
+  error.value = null;
+  order.value = null;
+  orderProductDisplayList.value = [];
+
+  try {
+    const res = await apiFindOrderById(id);
+    console.log("[Admin Detail] API Response for order detail:", res);
+
+    if (res && res.code === 200 && res.order) {
+      const apiOrderData = res.order;
+      // --- Robust State Mapping --- (Ensuring internal state is set)
+      let internalState = 'unknown';
+      const apiState = apiOrderData.order_state;
+      if (apiState === '待发货' || apiState === '已支付' || apiState === 'pending') {
+         internalState = 'pending';
+      } else if (apiState === '已发货' || apiState === '待收货' || apiState === 'shipped') {
+         internalState = 'shipped';
+      } else if (apiState === '已完成' || apiState === 'completed') {
+         internalState = 'completed';
+      } else if (apiState === '已取消' || apiState === 'cancelled') {
+         internalState = 'cancelled';
+      } else {
+         console.warn(`[Admin Detail] Unknown or unhandled order state from API: ${apiState}`);
+      }
+      // Set the main order ref with mapped state
+      order.value = { ...apiOrderData, order_state: internalState };
+
+      // Construct Product List for Table
+      if (apiOrderData.product_id) {
+          const quantity = apiOrderData.product_number || 0;
+          const totalPrice = apiOrderData.total_price || 0;
+          const unitPrice = quantity > 0 ? totalPrice / quantity : 0;
+          orderProductDisplayList.value = [{
+              product_id: apiOrderData.product_id,
+              product_name: apiOrderData.product_name,
+              product_picture: apiOrderData.product_img,
+              price: unitPrice,
+              quantity: quantity,
+              subtotal: totalPrice
+          }];
+      } else {
+          orderProductDisplayList.value = [];
+      }
+    } else {
+      throw new Error(res?.message || "未找到订单信息或加载失败");
     }
-  };
-  const foundOrder = mockOrders[orderId];
-  if (foundOrder) {
-      console.log('[Admin Detail] Order data found:', foundOrder);
-      order.value = foundOrder;
-      resetEditableFields(); // Initialize editable fields when data is loaded
-  } else {
-      console.error('[Admin Detail] No order data found for ID:', orderId);
-      message.error(`无法找到订单 ${orderId} 的详情`);
-      order.value = null; // Ensure order is null if not found
-      // Optionally redirect back
-      // router.push('/admin/orders'); 
+  } catch (err) {
+    console.error("[Admin Detail] 获取订单详情失败:", err);
+    error.value = err.message || "加载订单详情时发生错误";
+    order.value = null;
+    orderProductDisplayList.value = [];
+  } finally {
+    loading.value = false;
   }
 };
-// --- End Static Data --- 
 
-onMounted(() => {
-  const orderId = route.params.id;
-  console.log('[Admin Detail] Component mounted. Order ID from route params:', orderId);
-  if (orderId) {
-    fetchOrderDetail(orderId);
+// Helper Functions (from OrderDetail.vue)
+const getImageUrl = (relativePath) => {
+  if (relativePath) {
+    const baseUrl = apiConfig.BASE_URL.endsWith('/') ? apiConfig.BASE_URL : apiConfig.BASE_URL + '/';
+    const imagePath = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+    return baseUrl + imagePath;
   } else {
-    console.error('[Admin Detail] No order ID found in route params.');
-    message.error('无效的订单ID');
-    router.push('/admin/orders');
+    return 'https://placehold.co/80x80/EEE/AAA?text=No+Image';
   }
-});
+};
+const formatPrice = (price) => {
+  if (typeof price === 'number') {
+      return price.toFixed(2);
+  }
+  return '0.00';
+};
+const formatDateTime = (dateTimeString) => {
+    if (!dateTimeString) return 'N/A';
+    return dayjs(dateTimeString).format('YYYY-MM-DD HH:mm:ss');
+};
+const getTotalItems = (currentOrder) => {
+    return currentOrder?.product_number || 0;
+};
 
+// Status text/color using internal states (adapted for admin view)
 const getStatusText = (status) => {
   const statusMap = {
-    'pending': '待付款', // Should not appear in admin ideally?
-    'processing': '待发货',
+    'pending': '待发货',
     'shipped': '待收货',
     'completed': '已完成',
-    'cancelled': '已取消'
+    'cancelled': '已取消',
+    'unknown': '未知状态'
   };
   return statusMap[status] || status;
 };
-
 const getStatusColor = (status) => {
    const colorMap = {
-    'pending': 'orange',
-    'processing': 'blue',
+    'pending': 'blue', // Admin uses blue for pending
     'shipped': 'purple',
     'completed': 'green',
-    'cancelled': 'red'
+    'cancelled': 'red',
+    'unknown': 'default'
   };
   return colorMap[status] || 'default';
 };
 
-const getTotalItems = (currentOrder) => {
-  if (!currentOrder || !currentOrder.products) return 0;
-  return currentOrder.products.reduce((sum, product) => sum + product.quantity, 0);
-};
-
-// --- Admin Actions --- 
-
-const resetEditableFields = () => {
-    if (!order.value) return;
-    editableOrderState.value = order.value.order_state;
-    editableUserEmail.value = order.value.userEmail || '';
-    editableReceiver.value = order.value.receiver;
-    editableAddress.value = order.value.address;
-};
-
-const toggleEdit = (editMode) => {
-    isEditing.value = editMode;
-    if (!editMode) {
-        resetEditableFields(); // Reset fields if cancelling edit
-    }
-};
-
-const undoChanges = () => {
-    resetEditableFields();
-    toggleEdit(false);
-    message.info('修改已撤销');
-};
-
-const confirmChanges = async () => {
-    if (!order.value) return;
-    const updatedData = {
-        order_id: order.value.order_id,
-        order_state: editableOrderState.value,
-        receiver: editableReceiver.value,
-        address: editableAddress.value,
-        // userEmail: editableUserEmail.value, // Should email be editable?
-    };
-    console.log('确认修改，提交数据:', updatedData);
-    try {
-        // TODO: Replace with actual API call: apiAdminUpdateOrder(updatedData)
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-        
-        // Update local order data on success
-        order.value.order_state = updatedData.order_state;
-        order.value.receiver = updatedData.receiver;
-        order.value.address = updatedData.address;
-        // order.value.userEmail = updatedData.userEmail;
-        
-        message.success('订单信息更新成功！');
-        toggleEdit(false);
-    } catch (error) { 
-        console.error("更新订单失败:", error);
-        message.error('更新订单信息失败，请重试。');
-    }
-};
-
-const shipOrder = async (currentOrder) => {
-  console.log('发货操作 for order:', currentOrder.order_id);
+// Admin Actions (from previous ManageOrders.vue adaptation)
+const markAsShipped = async (orderToMark) => {
+  processingOrderId.value = orderToMark.order_id;
+  processingAction.value = 'ship';
   try {
-      // TODO: Replace with actual API call: apiAdminShipOrder(currentOrder.order_id)
-      await new Promise(resolve => setTimeout(resolve, 500));
-      if (order.value && order.value.order_id === currentOrder.order_id) {
-          order.value.order_state = 'shipped'; // Update local state
-          resetEditableFields(); // Update editable state as well
-      }
-      message.success(`订单 ${currentOrder.order_id} 已标记为发货！`);
-  } catch (error) {
-      console.error("发货失败:", error);
-      message.error('发货操作失败，请重试。');
+    const res = await apiMarkOrderAsShipped(orderToMark.order_id);
+    if (res && res.code === 200) {
+      message.success(`订单 ${orderToMark.order_id} 已标记为发货！`);
+      fetchOrderDetail(orderToMark.order_id); // Refresh details
+    } else {
+       // API function shows message
+    }
+  } catch (err) {
+      // API function shows message
+  } finally {
+    processingOrderId.value = null;
+    processingAction.value = null;
   }
 };
 
-const cancelOrderAdmin = async (currentOrder) => {
-  console.log('取消订单操作 for order:', currentOrder.order_id);
+const cancelOrderAdmin = async (orderToCancel) => {
+  processingOrderId.value = orderToCancel.order_id;
+  processingAction.value = 'cancel';
   try {
-      // TODO: Replace with actual API call: apiAdminCancelOrder(currentOrder.order_id)
-      await new Promise(resolve => setTimeout(resolve, 500)); 
-      if (order.value && order.value.order_id === currentOrder.order_id) {
-          order.value.order_state = 'cancelled'; // Update local state
-           resetEditableFields(); // Update editable state as well
-      }
-       message.success(`订单 ${currentOrder.order_id} 已取消！`);
+    const res = await apiCancelOrderByDeliver(orderToCancel.order_id);
+    if (res && res.code === 200) {
+       message.success(`订单 ${orderToCancel.order_id} 已取消！`);
+       fetchOrderDetail(orderToCancel.order_id); // Refresh details
+    } else {
+       // API function shows message
+    }
   } catch (error) {
-      console.error("取消订单失败:", error);
-      message.error('取消订单操作失败，请重试。');
+     // API function shows message
+  } finally {
+    processingOrderId.value = null;
+    processingAction.value = null;
   }
 };
 
-// --- Computed properties for button disabling logic ---
-const canShip = computed(() => order.value && order.value.order_state === 'processing');
-const canCancel = computed(() => order.value && (
-    order.value.order_state === 'pending' || // Should admin see pending?
-    order.value.order_state === 'processing'
-));
+// Go Back Function (from OrderDetail.vue)
+const goBack = () => {
+  router.back();
+};
+
+// Fetch data on mount (from OrderDetail.vue)
+onMounted(() => {
+  if (orderId.value) {
+    fetchOrderDetail(orderId.value);
+  } else {
+    error.value = '无效的订单ID';
+    loading.value = false;
+    message.error('无效的订单ID，将返回列表');
+    router.push('/admin/orders'); // Redirect admin back to list
+  }
+});
 
 </script>
 
 <style scoped>
-/* Copied styles from user/OrderDetail.vue and adjusted */
+/* Use styles from OrderDetail.vue and add/keep admin specifics */
 .order-detail-container {
   padding: 20px;
-  background-color: #f0f2f5; /* Admin background color */
+  background-color: #f0f2f5; /* Admin background */
+}
+
+.loading-state,
+.error-state,
+.not-found-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 20px;
+}
+
+.error-state .ant-alert {
+  width: 100%;
+  max-width: 600px;
+  text-align: left;
+}
+
+/* Use PageHeader styles */
+.site-page-header {
+  border: 1px solid rgb(235, 237, 240);
+  margin-bottom: 24px;
+  background-color: #fff;
 }
 
 .breadcrumb {
-  margin-bottom: 24px;
+  /* Removed, handled by PageHeader now */
 }
 
 .product-image {
   width: 60px;
   height: 60px;
   object-fit: cover;
+  border-radius: 4px;
 }
 
-.price, .subtotal {
+:deep(.ant-table-tbody > tr > td) {
+    padding: 12px 8px;
+}
+
+.price { /* Normal color */ }
+
+.subtotal {
   font-weight: 500;
-}
-
-.total-amount-desc {
-    /* Align value vertically */
-    display: flex;
-    align-items: center;
-}
-.total-amount-value {
-    font-size: 1.2em;
-    font-weight: bold;
-    color: #d9534f; /* Highlight total amount */
+  color: #f5222d;
 }
 
 .admin-actions-footer {
@@ -410,20 +411,22 @@ const canCancel = computed(() => order.value && (
   background-color: #fff;
   border-radius: 4px;
   box-shadow: 0 -1px 3px rgba(0,0,0,0.06);
-  text-align: right; /* Align buttons to the right */
+  text-align: right;
 }
 
-.loading-state {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 400px;
+:deep(.ant-descriptions-item-label) {
+    color: #666;
+    font-weight: normal !important;
 }
 
-/* Make descriptions items editable */
 :deep(.ant-descriptions-item-content) {
-    /* Allow inputs to take full width */
-    display: block;
+    font-weight: normal;
+}
+
+.total-amount-value {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #f5222d;
 }
 </style>
 

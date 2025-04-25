@@ -244,34 +244,17 @@ const toggleLike = async (product) => {
 
   try {
     const res = await apiToggleProductLike(userId, productId);
-    // Assuming the backend response (res.data) might contain the updated like count
-    // or a flag indicating success/type of action (liked/unliked)
     if (res && res.code === 200) {
-      // Update the like count based on backend response if available
-      // Example: if backend returns the new count
-      if (typeof res.like_number === 'number') { 
-         product.like_number = res.like_number;
-      } else {
-         // Fallback: refetch products or just increment/decrement locally 
-         // Incrementing might be inaccurate if it was an 'unlike' action
-         // Refetching is safer but heavier.
-         // Let's stick with the success message for now, as API doesn't specify return value.
-         console.log("Like toggled, but new count not returned by API. Consider refetching or local toggle.");
-         // Simple local toggle (might be incorrect if multiple users interact)
-         product.like_number = originalLikeCount + 1; // This is likely inaccurate for unliking.
-      }
+      // 点赞/取消点赞成功 (消息已由 API 函数显示)
+      // 重新获取商品列表以更新点赞数
+      fetchProducts(); 
     } else {
-      // API call failed (but didn't throw an error caught below, e.g., res.code !== 200)
-      // Revert optimistic update if you did one
-      // product.like_number = originalLikeCount;
-      // message is already shown by apiToggleProductLike
+      // API 调用失败或返回非200状态码 (消息已由 API 函数显示)
+      // 无需在此处额外操作
     }
   } catch (error) {
-    // Network error or error thrown by apiToggleProductLike
-    console.error("Error toggling like:", error);
-    // Revert optimistic update if you did one
-    // product.like_number = originalLikeCount;
-     // message is already shown by apiToggleProductLike
+    // 网络错误或其他错误 (消息已由 API 函数显示)
+    console.error("Error toggling like in Shop.vue:", error);
   }
 };
 

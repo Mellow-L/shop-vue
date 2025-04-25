@@ -40,9 +40,9 @@
           <span class="total-amount-value">¥{{ formatPrice(order.total_price) }}</span>
         </a-descriptions-item>
         <a-descriptions-item label="用户ID">{{ order.user_id }}</a-descriptions-item>
-        <a-descriptions-item label="收货人">{{ order.receiver || 'N/A' }}</a-descriptions-item>
-        <!-- <a-descriptions-item label="联系电话">{{ order.recipient_phone || 'N/A' }}</a-descriptions-item> -->
-        <a-descriptions-item label="收货地址" :span="{ xxl: 3, xl: 3, lg: 3, md: 3, sm: 1, xs: 1 }">{{ order.address || 'N/A' }}</a-descriptions-item>
+        <a-descriptions-item label="收货人">{{ parsedRecipientName }}</a-descriptions-item>
+        <a-descriptions-item label="联系邮箱">{{ parsedRecipientEmail }}</a-descriptions-item>
+        <a-descriptions-item label="收货地址" :span="{ xxl: 3, xl: 3, lg: 3, md: 3, sm: 1, xs: 1 }">{{ parsedFullAddress }}</a-descriptions-item>
       </a-descriptions>
     </a-card>
 
@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message, Spin, Alert, PageHeader, Card, Descriptions, DescriptionsItem, Tag, Table, Empty, Button } from 'ant-design-vue';
 // import { LikeOutlined } from '@ant-design/icons-vue'; // 如果需要操作按钮再引入
@@ -105,6 +105,27 @@ const orderProductDisplayList = ref([]); // *** New ref for table data ***
 const loading = ref(true);
 const error = ref(null);
 const orderId = ref(route.params.id);
+
+// --- 新增：解析地址的计算属性 ---
+const parsedRecipientName = computed(() => {
+    if (!order.value || !order.value.address || typeof order.value.address !== 'string') return 'N/A';
+    const parts = order.value.address.split(',');
+    return parts[0]?.trim() || 'N/A'; // 获取第一部分并去除空格
+});
+
+const parsedRecipientEmail = computed(() => {
+    if (!order.value || !order.value.address || typeof order.value.address !== 'string') return 'N/A';
+    const parts = order.value.address.split(',');
+    return parts[1]?.trim() || 'N/A'; // 获取第二部分并去除空格
+});
+
+const parsedFullAddress = computed(() => {
+    if (!order.value || !order.value.address || typeof order.value.address !== 'string') return 'N/A';
+    const parts = order.value.address.split(',');
+    // 从第三部分开始合并，并去除前导空格
+    return parts.slice(2).join(',').trim() || 'N/A'; 
+});
+// -------
 
 // 商品表格列配置
 const productColumns = [

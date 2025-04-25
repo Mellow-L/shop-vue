@@ -114,9 +114,8 @@
               @click="toggleLike"
               :loading="likeLoading"
             >
-              <like-filled v-if="isLiked" style="color: #1890ff"/>
-              <like-outlined v-else />
-              {{ isLiked ? '已赞' : '点赞' }} ({{ product.like_number || 0 }})
+              <like-outlined />
+              点赞 ({{ product.like_number || 0 }})
             </a-button>
           </div>
         </div>
@@ -313,19 +312,22 @@ const toggleLike = async () => {
    if (!product.value) return;
    
    likeLoading.value = true;
-   const originalLikeStatus = isLiked.value;
-   const originalLikeCount = product.value.like_number || 0;
    
    try {
-      // apiToggleProductLike 内部处理消息
+      // apiToggleProductLike handles showing success/error messages
       const res = await apiToggleProductLike(userId, product.value.product_id);
       if (res && res.code === 200) {
-         isLiked.value = !originalLikeStatus;
-         product.value.like_number = isLiked.value ? originalLikeCount + 1 : Math.max(0, originalLikeCount - 1);
+         // 点赞/取消点赞成功 (消息已由 API 函数显示)
+         // 重新获取商品详情以更新点赞数
+         fetchProductDetails(); 
+         // 注意：isLiked 状态暂时不更新，因为没有可靠的方式判断当前状态
+         // isLiked.value = res.like_number > originalLikeCount; // 移除此行
       } else {
-         console.error("点赞操作失败 (API response - ProductDetail):", res);
+         // API 调用失败或返回非200状态码 (消息已由 API 函数显示)
+         console.error("点赞操作API未返回成功状态码 (ProductDetail):", res);
       }
    } catch (error) {
+      // 网络错误或其他错误 (消息已由 API 函数显示)
       console.error("点赞操作失败 (catch block - ProductDetail):", error);
    } finally {
         likeLoading.value = false;

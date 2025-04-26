@@ -116,7 +116,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue'; 
-import { message, Spin, Empty, Button, InputSearch, Table, InputNumber, Alert } from 'ant-design-vue'; // 引入所需组件
+import { message, Spin, Empty, Button, InputSearch, Table, InputNumber, Alert, Modal } from 'ant-design-vue'; // Import Modal
 import { useRouter } from 'vue-router';
 import { apiFindAllOrders, apiUpdateOrderQuantity, apiDeleteCartItem } from '@/api/order'; // 引入 API
 import apiConfig from '@/config/api'; // 引入 API 配置
@@ -289,28 +289,43 @@ const updateQuantity = async (record) => {
 
 // 删除单项 (调用 API)
 const removeItem = async (record) => {
-  const userId = getUserId();
-  if (!userId) return;
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要将商品 "${record.product_name}" 从购物车中移除吗？`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() { // Make the onOk async
+        const userId = getUserId();
+        if (!userId) { message.error("无法获取用户信息"); return; }
 
-  record.deleting = true; 
-  try {
-    const res = await apiDeleteCartItem(record.product_id, userId);
-    if (res && res.code === 200) {
-      const index = cartItems.value.findIndex(item => item.order_id === record.order_id);
-      if (index !== -1) {
-        cartItems.value.splice(index, 1); 
-      }
-      selectedRowKeys.value = selectedRowKeys.value.filter(key => key !== record.order_id);
-      // *** 移除这里的 message.success，因为 API 函数已处理 ***
-      // message.success('商品已从购物车移除');
-    } else {
-      console.error("删除商品失败 (API Response):", res);
-    }
-  } catch (error) {
-    console.error("删除商品失败 (Catch Block):", error);
-  } finally {
-     record.deleting = false; 
-  }
+        record.deleting = true; 
+        try {
+            const res = await apiDeleteCartItem(record.product_id, userId);
+            if (res && res.code === 200) {
+              // Remove from local list immediately for better UX
+              const index = cartItems.value.findIndex(item => item.order_id === record.order_id);
+              if (index !== -1) {
+                cartItems.value.splice(index, 1); 
+              }
+              // Update selected keys if the deleted item was selected
+              selectedRowKeys.value = selectedRowKeys.value.filter(key => key !== record.order_id);
+              // Success message shown by API function
+            } else {
+              // Error message shown by API function
+              console.error("删除商品失败 (API Response):", res);
+            }
+        } catch (error) {
+            // Error message shown by API function
+            console.error("删除商品失败 (Catch Block):", error);
+        } finally {
+            record.deleting = false; 
+        }
+    },
+    onCancel() {
+      console.log('取消删除单个商品');
+    },
+  });
 };
 
 // 删除选中项 (调用 API)
@@ -318,37 +333,52 @@ const removeSelectedItems = async () => {
   const userId = getUserId();
   if (!userId || !hasSelected.value) return;
 
-  deletingSelected.value = true;
-  const keysToRemove = [...selectedRowKeys.value];
-  const itemsToRemove = cartItems.value.filter(item => keysToRemove.includes(item.order_id));
-  let successCount = 0;
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除选中的 ${selectedRowKeys.value.length} 件商品吗？`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+        deletingSelected.value = true;
+        const keysToRemove = [...selectedRowKeys.value];
+        const itemsToRemove = cartItems.value.filter(item => keysToRemove.includes(item.order_id));
+        let successCount = 0;
+        const failedItems = [];
 
-  for (const item of itemsToRemove) {
-      item.deleting = true; 
-      try {
-          const res = await apiDeleteCartItem(item.product_id, userId);
-          if (res && res.code === 200) {
-              successCount++;
-          } else {
-              // *** 只记录日志，不显示 message，因为 API 函数已处理 ***
-              console.error(`删除商品 ${item.product_name} (ID: ${item.product_id}) 失败 (API Response):`, res);
-          }
-      } catch (error) {
-           // *** 只记录日志，不显示 message，因为 API 函数已处理 ***
-          console.error(`删除商品 ${item.product_name} (ID: ${item.product_id}) 失败 (Catch Block):`, error);
-      }
-  }
-  
-  // 全部完成后刷新列表并给出提示 (保留这里的总结性提示)
-  await fetchCartItems(); 
-  selectedRowKeys.value = []; 
-  deletingSelected.value = false;
-  
-  if (successCount === itemsToRemove.length) {
-      message.success(`成功移除 ${successCount} 件商品`);
-  } else {
-      message.warning(`移除了 ${successCount} / ${itemsToRemove.length} 件商品，部分商品移除失败，请重试。`);
-  }
+        // Loop and call API for each item
+        for (const item of itemsToRemove) {
+            item.deleting = true; 
+            try {
+                const res = await apiDeleteCartItem(item.product_id, userId);
+                if (res && res.code === 200) {
+                    successCount++;
+                } else {
+                    failedItems.push(item.product_name);
+                    console.error(`删除商品 ${item.product_name} (ID: ${item.product_id}) 失败 (API Response):`, res);
+                }
+            } catch (error) {
+                 failedItems.push(item.product_name);
+                 console.error(`删除商品 ${item.product_name} (ID: ${item.product_id}) 失败 (Catch Block):`, error);
+            }
+        }
+        
+        // Refresh the entire list after all attempts
+        await fetchCartItems(); 
+        selectedRowKeys.value = []; // Clear selection regardless of outcome
+        deletingSelected.value = false;
+        
+        // Provide summary message
+        if (failedItems.length === 0) {
+            message.success(`成功移除选中的 ${successCount} 件商品`);
+        } else {
+             message.warning(`成功移除 ${successCount} 件商品，${failedItems.length} 件移除失败。`);
+        }
+    },
+    onCancel() {
+        console.log('取消删除选中商品');
+    },
+  });
 };
 
 // 结算选中项

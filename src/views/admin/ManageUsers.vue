@@ -102,19 +102,18 @@ const fetchUsers = async () => {
   loading.value = true;
   error.value = null;
   let apiCall;
-  let params = {};
 
   if (searchValue.value) {
       console.log(`Searching users for: ${searchValue.value}`);
-      // Assuming apiSearchUserList can search by id, name, or email
-      // You might need separate params based on input type
-      params = { query: searchValue.value }; // Adjust param name as needed by API
-      apiCall = () => apiSearchUserList(params);
+      // Call apiSearchUserList with the search string directly
+      apiCall = () => apiSearchUserList(searchValue.value); 
   } else {
       console.log("Fetching all users");
-      // Add pagination params if API supports it
-      // params = { page: pagination.current, size: pagination.pageSize };
-      apiCall = () => apiGetUserList(params);
+      // apiGetUserList might still accept params for pagination etc.
+      let listParams = {}; 
+      // Example pagination (if needed later):
+      // listParams = { page: pagination.current, size: pagination.pageSize };
+      apiCall = () => apiGetUserList(listParams);
   }
 
   try {

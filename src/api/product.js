@@ -134,7 +134,7 @@ export async function apiDeleteProduct(productId) {
 
 export async function apiUpdateProduct(productData) {
   try {
-    const res = await axios.put('/api/product/update/productinfo', productData);
+    const res = await axios.put('/api/product/update/productinfo', qs.stringify(productData));
     if (res?.data?.code === 200) {
         showSuccess(apiUpdateProduct.name, "商品信息更新成功");
         return res.data;

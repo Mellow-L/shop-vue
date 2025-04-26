@@ -11,18 +11,14 @@
         allowClear
       >
         <a-select-option value="">全部分类</a-select-option>
-        <a-select-option value="electronics">电子产品</a-select-option>
-        <a-select-option value="clothing">服装</a-select-option>
-        <a-select-option value="food">食品</a-select-option>
-        <a-select-option value="books">图书</a-select-option>
-        <a-select-option value="手机">手机</a-select-option>
-        <a-select-option value="电脑">电脑</a-select-option>
-        <a-select-option value="裤子">裤子</a-select-option>
-        <a-select-option value="衣服">衣服</a-select-option>
-        <a-select-option value="鞋子">鞋子</a-select-option>
-        <a-select-option value="化妆品">化妆品</a-select-option>
-        <a-select-option value="美食">美食</a-select-option>
-        <a-select-option value="嘻嘻">嘻嘻</a-select-option>
+        <a-select-option value="饮品/乳品">饮品/乳品</a-select-option>
+        <a-select-option value="零食/速食">零食/速食</a-select-option>
+        <a-select-option value="日用百货">日用百货</a-select-option>
+        <a-select-option value="蔬菜水果">蔬菜水果</a-select-option>
+        <a-select-option value="生禽肉蛋">生禽肉蛋</a-select-option>
+        <a-select-option value="服装服饰">服装服饰</a-select-option>
+        <a-select-option value="数码家电">数码家电</a-select-option>
+        <a-select-option value="美妆护肤">美妆护肤</a-select-option>
       </a-select>
       <a-input-search
         v-model:value="searchValue"

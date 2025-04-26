@@ -16,15 +16,15 @@
         @change="handleFilterChange"
         allowClear
       >
-        <!-- Options can be dynamic or hardcoded -->
         <a-select-option value="">全部分类</a-select-option>
-        <a-select-option value="electronics">电子产品</a-select-option>
-        <a-select-option value="clothing">服装</a-select-option>
-        <a-select-option value="food">食品</a-select-option>
-        <a-select-option value="books">图书</a-select-option>
-        <a-select-option value="手机">手机</a-select-option>
-        <a-select-option value="电脑">电脑</a-select-option>
-        <!-- Add more -->
+        <a-select-option value="饮品/乳品">饮品/乳品</a-select-option>
+        <a-select-option value="零食/速食">零食/速食</a-select-option>
+        <a-select-option value="日用百货">日用百货</a-select-option>
+        <a-select-option value="蔬菜水果">蔬菜水果</a-select-option>
+        <a-select-option value="生禽肉蛋">生禽肉蛋</a-select-option>
+        <a-select-option value="服装服饰">服装服饰</a-select-option>
+        <a-select-option value="数码家电">数码家电</a-select-option>
+        <a-select-option value="美妆护肤">美妆护肤</a-select-option>
       </a-select>
       <a-input-search
         v-model:value="searchValue"
@@ -165,10 +165,10 @@
       </a-form>
     </a-modal>
 
-  </div>
-</template>
-
-<script setup>
+    </div>
+  </template>
+  
+  <script setup>
 import { ref, reactive, onMounted, nextTick, watch } from 'vue';
 import { message, Spin, Empty, Button, List, Card, CardMeta, Tag, Modal, Form, FormItem, Input, InputNumber, Textarea, Popconfirm, Tooltip, Upload, Alert, Row, Col, Avatar, Select, SelectOption, InputSearch } from 'ant-design-vue';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons-vue';
@@ -515,10 +515,10 @@ const handleSearch = () => {
 onMounted(() => {
   fetchProducts();
 });
-
-</script>
-
-<style scoped>
+  
+  </script>
+  
+  <style scoped>
 .manage-products-container {
   padding: 24px;
 }
@@ -661,5 +661,5 @@ onMounted(() => {
   gap: 16px;      
 }
 
-</style>
+  </style>
   

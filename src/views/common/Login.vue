@@ -48,18 +48,28 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { reactive, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import { apiLogin } from '../../api/user';
 
 const router = useRouter();
+const rememberMeKey = 'rememberedEmail';
 
 const formState = reactive({
   email: '',
   password: '',
   remember: true,
   isManager: false,
+});
+
+onMounted(() => {
+    const rememberedEmail = localStorage.getItem(rememberMeKey);
+    if (rememberedEmail) {
+        formState.email = rememberedEmail;
+        formState.remember = true;
+        console.log('Remembered email loaded:', rememberedEmail);
+    }
 });
 
 const onLogin = async () => { 
@@ -70,19 +80,23 @@ const onLogin = async () => {
     };
 
     try {
-        // 调用 apiLogin，它内部会处理成功或失败（特定原因）的消息
         const res = await apiLogin(loginPayload); 
 
-        // 检查 API 调用是否成功并返回了 user 数据
         if (res && res.code === 200 && res.user) {
-            // *** 存储用户信息到 localStorage ***
+            if (formState.remember) {
+                localStorage.setItem(rememberMeKey, formState.email);
+                console.log('Email remembered:', formState.email);
+            } else {
+                localStorage.removeItem(rememberMeKey);
+                console.log('Remembered email cleared.');
+            }
+
             try {
                 localStorage.setItem('userInfo', JSON.stringify(res.user));
                 localStorage.setItem('isLoggedIn', 'true'); 
                 localStorage.setItem('isManager', loginPayload.isManager ? 'true' : 'false');
                 console.log('Login successful, userInfo saved:', res.user);
 
-                // 根据是否为管理员进行跳转
                 if (loginPayload.isManager) {
                     router.push('/admin/products');
                 } else {
@@ -90,17 +104,12 @@ const onLogin = async () => {
                 }
             } catch (storageError) {
                 console.error("Failed to save user info to localStorage:", storageError);
-                // 这个错误比较特殊，需要提示
                 message.error('无法保存登录状态，请稍后重试'); 
             }
         } else {
-            // *** 不需要这里的 message.error ***
-            // apiLogin 内部应该已经显示了具体的失败消息 (如"用户不存在", "密码错误")
             console.log("Login API call returned non-200 or missing user data:", res);
         }
     } catch (error) {
-        // *** 不需要这里的 message.error ***
-        // apiLogin 内部在其 catch 块中处理了网络等错误
         console.error("Error during login process (network or other):", error);
     }
 };

@@ -134,7 +134,7 @@ import { message, Spin, Alert, Breadcrumb, BreadcrumbItem, Row, Col, Tag, Divide
 import { useRouter, useRoute } from 'vue-router';
 import { LikeOutlined, LikeFilled } from '@ant-design/icons-vue';
 import { apiFindProductById } from '@/api/product'; // 引入真实 API
-import { apiAddOrder } from '@/api/order'; // 引入真实 API
+import { apiAddtoCart } from '@/api/order'; // 引入真实 API
 import { apiToggleProductLike } from '@/api/product_like'; // 引入点赞 API
 import apiConfig from '@/config/api'; // 引入 API 配置
 
@@ -259,7 +259,7 @@ const addToCart = async () => {
 
   try {
     // apiAddOrder 内部处理消息
-    await apiAddOrder(orderData); 
+    await apiAddtoCart(orderData); 
   } catch (err) {
     // apiAddOrder 内部处理消息
     console.error("添加到购物车失败 (catch block - ProductDetail):", err);

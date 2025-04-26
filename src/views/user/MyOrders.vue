@@ -110,7 +110,7 @@ import { ref, computed, reactive, onMounted } from 'vue';
 import { message, Spin, Empty, Button as AButton, Select as ASelect, InputSearch as AInputSearch, SelectOption as ASelectOption, Tag as ATag, CardMeta as ACardMeta, Card as ACard, Row as ARow, Col as ACol, List as AList, Tabs as ATabs, TabPane as ATabPane, RangePicker as ARangePicker, Alert as AAlert } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import dayjs from 'dayjs';
-import { apiFindOrdersByUserId, apiUpdateOrderStatus, apiCancelOrderByDeliver, apiFindOrdersByState, apiConfirmReceiptByDeliver } from '@/api/order';
+import { apiFindOrdersByUserId, apiUpdateOrderStatus, apiCancelOrderByDeliver, apiManagerFindOrdersByState, apiConfirmReceiptByDeliver } from '@/api/order';
 import apiConfig from '@/config/api';
 
 const router = useRouter();
@@ -185,7 +185,7 @@ const fetchUserOrders = async (state = null) => {
     if (state && state !== 'all') {
       const apiState = mapFrontendStateToApiState(state);
       console.log(`Fetching orders for user ${userId} with state: ${state} (API: ${apiState})`);
-      res = await apiFindOrdersByState(apiState, userId);
+      res = await apiManagerFindOrdersByState(apiState, userId);
     } else {
       console.log(`Fetching all orders for user ${userId}`);
       res = await apiFindOrdersByUserId(userId);

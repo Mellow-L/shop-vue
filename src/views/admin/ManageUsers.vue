@@ -97,10 +97,10 @@ const getFullImageUrl = (relativePath) => {
   return baseUrl + imagePath;
 };
 
-// Fetch users function (handles search)
+// Fetch users function (handles search) with modified error handling
 const fetchUsers = async () => {
   loading.value = true;
-  error.value = null;
+  error.value = null; // Reset error
   let apiCall;
 
   if (searchValue.value) {
@@ -120,18 +120,28 @@ const fetchUsers = async () => {
     const res = await apiCall();
     if (res && res.code === 200 && Array.isArray(res.list)) {
       users.value = res.list;
-      // Assuming API returns total count for pagination, otherwise calculate from list length
       pagination.total = res.totalCount || res.list.length;
     } else {
+      // Treat non-200 or invalid list as not found
       users.value = [];
       pagination.total = 0;
       throw new Error(res?.message || '获取用户列表失败');
     }
   } catch (err) {
-    console.error("获取用户列表失败:", err);
-    error.value = err.message || '加载用户数据时出错';
-    users.value = [];
-    pagination.total = 0;
+    console.error("[ManageUsers] 获取用户列表失败:", err);
+    // --- MODIFIED ERROR HANDLING --- 
+    if (err.isAxiosError && err.response?.status === 404) {
+      console.log("[ManageUsers] Received 404 Not Found from API.");
+      users.value = [];
+      pagination.total = 0;
+      error.value = null; // Don't show the error Alert
+    } else {
+      // For other errors, set the error message for the Alert
+      error.value = err.message || '加载用户数据时出错';
+      users.value = []; 
+      pagination.total = 0;
+    }
+    // --- END MODIFIED ERROR HANDLING ---
   } finally {
     loading.value = false;
   }

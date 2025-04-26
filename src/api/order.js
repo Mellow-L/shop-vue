@@ -8,24 +8,40 @@ export const axiosClient = axios.create({
   timeout: apiConfig.TIMEOUT || 5000
 });
 
-// 添加订单/加入购物车
+// 购买，生成订单
 export async function apiAddOrder(orderJsonData) {
   try {
     // 直接发送 JS 对象，Axios 会自动处理为 application/json
-    const res = await axiosClient.post('/api/order/add/order', orderJsonData);
+    const res = await axiosClient.post('/api/order/add/shop', orderJsonData);
     if (res?.data?.code === 200) {
-        showSuccess(apiAddOrder.name, "订单添加成功");
+        showSuccess(apiAddOrder.name, "添加成功");
         return res.data;
     } else {
-        showFail(apiAddOrder.name, res?.data?.message || "订单添加失败");
-        throw new Error(res?.data?.message || "订单添加失败");
+        showFail(apiAddOrder.name, res?.data?.message || "添加失败");
+        throw new Error(res?.data?.message || "添加失败");
     }
   } catch (error) {
-    showFail(apiAddOrder.name, error.message || "订单添加失败");
+    showFail(apiAddOrder.name, error.message || "添加失败");
     throw error;
   }
 }
 
+export async function apiAddtoCart(orderJsonData) {
+  try {
+    // 直接发送 JS 对象，Axios 会自动处理为 application/json
+    const res = await axiosClient.post('/api/order/add/order', orderJsonData);
+    if (res?.data?.code === 200) {
+        showSuccess(apiAddtoCart.name, "添加成功");
+        return res.data;
+    } else {
+        showFail(apiAddtoCart.name, res?.data?.message || "添加失败");
+        throw new Error(res?.data?.message || "添加失败");
+    }
+  } catch (error) {
+    showFail(apiAddtoCart.name, error.message || "添加失败");
+    throw error;
+  }
+}
 // 删除购物车商品
 export async function apiDeleteCartItem(productId, userId) {
   try {
@@ -291,3 +307,30 @@ export async function apiFindOrdersByState(orderState, userId = null) {
     throw error;
   }
 }
+
+export async function apiManagerFindOrdersByState(orderState, userId = null) {
+  const functionName = apiManagerFindOrdersByState.name;
+  try {
+    const params = { order_state: orderState };
+    if (userId !== null) {
+      params.user_id = userId;
+    }
+    
+    // 假设后端接口是 /api/order/find/order_state
+    const res = await axiosClient.get(`/api/order/find-orderstate-userid`, { params });
+
+    if (res?.data?.code === 200) {
+        // 查询成功不显示全局消息，由调用处处理
+        return res.data; 
+    } else {
+        const errorMsg = res?.data?.message || `按状态查询订单失败 (State: ${orderState}, UserID: ${userId})`;
+        showFail(functionName, errorMsg);
+        throw new Error(errorMsg);
+    }
+  } catch (error) {
+    const errorMsg = error.message || `按状态查询订单时发生网络错误 (State: ${orderState}, UserID: ${userId})`;
+    showFail(functionName, errorMsg);
+    throw error;
+  }
+}
+

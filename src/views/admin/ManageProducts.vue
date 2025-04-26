@@ -106,7 +106,7 @@
       @cancel="handleCancel"
       ok-text="确认"
       cancel-text="取消"
-      width="700px" 
+      :width="isEditing ? '700px' : '500px'"
       :destroyOnClose="true"
     >
       <a-form
@@ -117,9 +117,9 @@
         name="product_form"
       >
         <a-row :gutter="24">
-          <!-- Left Column: Image Upload -->
-          <a-col :span="8">
-            <a-form-item label="商品图片" name="product_picture_upload"> 
+          <!-- Left Column: Image Upload (ONLY for Editing) -->
+          <a-col v-if="isEditing" :span="8">
+            <a-form-item label="商品图片">
               <div class="image-upload-container">
                  <a-avatar :size="140" shape="square" :src="imagePreviewUrl || getImageUrl(currentProduct.product_picture) || 'https://placehold.co/200x200?text=No+Image'" />
                  <a-upload
@@ -139,8 +139,8 @@
             </a-form-item>
           </a-col>
 
-          <!-- Right Column: Form Fields -->
-          <a-col :span="16">
+          <!-- Right Column: Form Fields (Full width if not editing) -->
+          <a-col :span="isEditing ? 16 : 24">
             <a-form-item label="商品名称" name="product_name">
               <a-input v-model:value="currentProduct.product_name" placeholder="请输入商品名称" />
             </a-form-item>
@@ -157,9 +157,21 @@
                 </a-col>
             </a-row>
              <a-form-item label="商品类别" name="product_class">
-              <a-input v-model:value="currentProduct.product_class" placeholder="请输入商品类别" />
+              <a-select
+                v-model:value="currentProduct.product_class"
+                placeholder="请选择商品类别"
+                allowClear
+              >
+                <a-select-option value="饮品/乳品">饮品/乳品</a-select-option>
+                <a-select-option value="零食/速食">零食/速食</a-select-option>
+                <a-select-option value="日用百货">日用百货</a-select-option>
+                <a-select-option value="蔬菜水果">蔬菜水果</a-select-option>
+                <a-select-option value="生禽肉蛋">生禽肉蛋</a-select-option>
+                <a-select-option value="服装服饰">服装服饰</a-select-option>
+                <a-select-option value="数码家电">数码家电</a-select-option>
+                <a-select-option value="美妆护肤">美妆护肤</a-select-option>
+              </a-select>
             </a-form-item>
-             <!-- Removed Intro and Picture Input -->
           </a-col>
         </a-row>
       </a-form>
@@ -215,7 +227,7 @@ const pagination = reactive({
 // Form validation rules
 const rules = {
   product_name: [{ required: true, message: '请输入商品名称', trigger: 'blur' }],
-  product_class: [{ required: true, message: '请输入或选择商品类别', trigger: 'blur' }],
+  product_class: [{ required: true, message: '请选择商品类别', trigger: 'change' }],
   product_price: [{ required: true, type: 'number', message: '请输入有效的商品价格', trigger: 'change' }],
   product_stock: [{ required: true, type: 'number', message: '请输入有效的商品库存', trigger: 'change' }],
 };
@@ -230,7 +242,7 @@ watch([categoryValue, searchValue], () => {
 // Modified fetchProducts to handle filters
 const fetchProducts = async () => {
   loading.value = true;
-  error.value = null;
+  error.value = null; // Reset error before fetching
   const params = {}; 
 
   let apiCall;
@@ -267,10 +279,24 @@ const fetchProducts = async () => {
       throw new Error(res?.message || `获取商品列表失败`);
     }
   } catch (err) {
-    console.error("获取商品列表失败:", err);
-    error.value = err.message || '加载商品数据时出错';
-    products.value = [];
-    pagination.total = 0;
+    console.error("[ManageProducts] 获取商品列表失败:", err);
+    // --- MODIFIED ERROR HANDLING --- 
+    // Check if the error is an Axios error with a 404 status
+    if (err.isAxiosError && err.response?.status === 404) {
+      console.log("[ManageProducts] Received 404 Not Found from API.");
+      // Set products to empty array to trigger the empty state display
+      products.value = [];
+      pagination.total = 0;
+      // Ensure no generic error message is shown in the Alert component
+      error.value = null; 
+    } else {
+      // For other errors, show the error message in the Alert component
+      // API function likely already showed a message via showFail
+      error.value = err.message || '加载商品数据时出错';
+      products.value = []; // Also clear products on other errors
+      pagination.total = 0;
+    }
+    // --- END MODIFIED ERROR HANDLING ---
   } finally {
     loading.value = false;
   }
@@ -325,23 +351,50 @@ const beforeImageUpload = (file) => {
   return isJpgOrPng && isLt5M;
 };
 
-// This function is called by customRequest. It *doesn't* upload immediately.
-// It just prepares the file and preview for the handleOk function.
-const handleImageUploadChange = (info) => {
-    // We use customRequest, so we only get the file object here
+// Modified: Add logging to confirm path stored
+const handleImageUploadChange = async (info) => {
     const file = info.file;
     console.log("Image selected:", file);
+
     if (beforeImageUpload(file)) {
         getBase64(file, base64Url => {
             imagePreviewUrl.value = base64Url;
         });
-        currentImageFile.value = file; // Store the file to be uploaded later in handleOk
+        currentImageFile.value = file;
+
+        if (isEditing.value && currentProduct.value?.product_id) {
+            imageUploading.value = true;
+            try {
+                 const res = await apiAddProductPicture(currentProduct.value.product_id, file);
+
+                 // Check response structure based on previous error
+                 if (res && res.code === 200 && res.product?.product_picture) {
+                     const newRelativePath = res.product.product_picture;
+                     // --- ADDED LOGGING --- 
+                     console.log(`[handleImageUploadChange] Success. Storing relative path in currentProduct.product_picture: "${newRelativePath}"`);
+                     // --- END LOGGING --- 
+                     currentProduct.value.product_picture = newRelativePath;
+                     currentImageFile.value = null; 
+                     imagePreviewUrl.value = ''; // Clear preview, rely on getImageUrl
+                 } else {
+                     console.error("Image upload API call did not return success code or product.product_picture path:", res);
+                     imagePreviewUrl.value = ''; 
+                     currentImageFile.value = null; 
+                 }
+            } catch (err) {
+                console.error("Immediate image upload failed (catch block):", err);
+                imagePreviewUrl.value = ''; 
+                currentImageFile.value = null; 
+            } finally {
+                imageUploading.value = false;
+            }
+        } else {
+            console.log("Add mode: Image file stored for later upload.");
+        }
     } else {
-        imagePreviewUrl.value = ''; // Clear preview if invalid
+        imagePreviewUrl.value = '';
         currentImageFile.value = null;
     }
-    // No actual upload happens here, handleOk will manage it.
-    // We don't call info.onSuccess or info.onError here.
 };
 
 // --- Modal Actions ---\n
@@ -400,78 +453,52 @@ const handleOk = async () => {
     };
 
     let primaryOperationSuccess = false;
-    let imageUploadAttempted = false;
-    let imageUploadError = false;
-    let newProductId = null;
 
     if (isEditing.value) {
-        // --- EDIT INFO ---
+        // --- EDIT INFO --- 
+        // Image upload is handled immediately by handleImageUploadChange
+        console.log("[handleOk Edit] Updating product info:", productData);
         const updateInfoRes = await apiUpdateProduct(productData);
         if (updateInfoRes && updateInfoRes.code === 200) {
             primaryOperationSuccess = true;
         } else { 
-            // Error handled by API func
+             // API func shows error
         }
     } else {
-        // --- ADD INFO FIRST ---
+        // --- ADD INFO ONLY (No Image Upload Here) --- 
         const dataToAdd = { ...productData };
-        delete dataToAdd.product_id;
+        delete dataToAdd.product_id; // Remove potential id from copied data
+        delete dataToAdd.product_picture; // Ensure no picture path is sent initially
+
+        console.log("[handleOk Add] Adding product info (without image):", dataToAdd);
         let addInfoRes;
         try {
             addInfoRes = await apiAddProduct(dataToAdd);
             if (addInfoRes && addInfoRes.code === 200) {
                 primaryOperationSuccess = true; 
-                if (addInfoRes.data?.product_id) {
-                    newProductId = addInfoRes.data.product_id;
-                    // --- TRY TO UPLOAD IMAGE (Add Mode) --- 
-                    if (currentImageFile.value) {
-                        imageUploadAttempted = true;
-                        try {
-                            const uploadRes = await apiAddProductPicture(newProductId, currentImageFile.value);
-                            if (!uploadRes || uploadRes.code !== 200) {
-                                 imageUploadError = true; 
-                                 message.warning(`商品信息已添加，但图片上传失败: ${uploadRes?.message || '请检查接口'}`);
-                            }
-                        } catch (imgError) {
-                             imageUploadError = true;
-                             message.warning(`商品信息已添加，但图片上传出错: ${imgError.message || '请检查接口'}`);
-                        }
-                    }
-                } else {
-                    // ID missing from response
-                    imageUploadAttempted = currentImageFile.value ? true : false;
-                    imageUploadError = true; 
-                    message.warning('商品信息已添加，但无法获取新 ID 以上传图片。');
-                }
+                console.log("[handleOk Add] Product info added successfully.");
+                // No need to check for product_id or upload image here anymore
             } else {
-                 primaryOperationSuccess = false; // Mark primary op as failed
+                 primaryOperationSuccess = false; 
+                 console.error("[handleOk Add] apiAddProduct failed:", addInfoRes);
+                 // API func shows error
             }
         } catch (addError) {
              primaryOperationSuccess = false; 
+             console.error("[handleOk Add] Error during apiAddProduct call:", addError);
+             // API func shows error
         }
     }
 
     // --- Final Outcome --- 
     if (primaryOperationSuccess) {
-        isModalVisible.value = false; // Close modal immediately after info success
-
-        // Show success message (conditionally)
-        if (!imageUploadError) {
-            message.success(isEditing.value ? '商品更新成功！' : '商品添加成功！');
-        }
-        
-        // --- ADDED: Set flag before delayed fetch --- 
-        if (!isEditing.value && newProductId) {
-            window.lastAddedProductId = newProductId; // Set temporary flag
-        }
-        // --- END ADDED --- 
-        
-        const delay = isEditing.value ? 0 : 300; // Slightly longer delay for debugging
-        setTimeout(() => {
-            fetchProducts(); 
-        }, delay);
-
-    }
+        isModalVisible.value = false;
+        // Refresh list after successful add or edit
+        // No delay needed now as secondary image upload is removed from add flow
+        fetchProducts(); 
+        message.success(isEditing.value ? '商品更新成功！' : '商品添加成功！');
+    } 
+    // If primaryOperationSuccess is false, modal stays open, error shown by API func
 
   } catch (validationError) {
       if (validationError?.errorFields) {

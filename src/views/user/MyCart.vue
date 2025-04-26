@@ -70,10 +70,14 @@
               <a-input-number
                 v-model:value="record.quantity"
                 :min="1"
-                :max="99" 
+                :max="record.product_stock === null || record.product_stock === undefined ? 99 : record.product_stock || 1" 
                 @change="updateQuantity(record)"
-                :disabled="record.updating" 
+                :disabled="record.updating || record.product_stock === 0" 
+                style="width: 80px;" 
               />
+              <div v-if="record.product_stock !== null && record.product_stock !== undefined" style="font-size: 12px; color: #888; margin-top: 4px;">
+                (库存: {{record.product_stock}})
+              </div>
             </template>
             
             <template v-else-if="column.key === 'subtotal'">
@@ -192,9 +196,10 @@ const fetchCartItems = async () => {
             ...item, // 包含所有 API 返回的字段，如 order_id, product_id, user_id 等
             quantity: item.product_number, // 将 product_number 映射到 quantity
             // 计算单价，注意处理 quantity 为 0 的情况
-            product_price: item.product_number > 0 ? (item.total_price / item.product_number) : 0, 
+            product_price: item.product_number > 0 ? ((item.total_price || 0) / item.product_number) : 0, 
             // *** 添加图片字段映射 ***
             product_picture: item.product_img || null, // 假设API返回的是 product_img
+            product_stock: item.product_stock, // <<< MAKE SURE API RETURNS THIS and it's mapped
             // 添加加载状态，用于后续操作
             updating: false, 
             deleting: false
@@ -267,8 +272,16 @@ const totalSelectedPrice = computed(() => {
 // 更新数量 (调用 API)
 const updateQuantity = async (record) => {
   const userId = getUserId();
-  if (!userId) return; 
-  
+  if (!userId) return;
+
+  // Optional double check (if product_stock is available)
+  if (record.product_stock !== null && record.product_stock !== undefined && record.quantity > record.product_stock) {
+      message.error('数量不能超过库存！');
+      record.quantity = record.product_stock; // Reset to max
+      // Potentially avoid API call if quantity was invalid before change
+      // return; 
+  }
+
   record.updating = true; 
   try {
     const res = await apiUpdateOrderQuantity(record.product_id, userId, record.quantity);

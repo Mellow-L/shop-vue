@@ -85,30 +85,49 @@ export async function apiGetUserList() {
   }
 }
 
-// 搜索用户 (Updated to use SearchContent parameter)
-export async function apiSearchUserList(searchTerm) { // Changed parameter from searchParams to searchTerm
+// 搜索用户 (Updated to handle 404 specifically in catch)
+export async function apiSearchUserList(searchTerm) { 
   const functionName = apiSearchUserList.name;
   try {
-    // Construct params object with the correct key
     const params = { SearchContent: searchTerm }; 
     console.log(`[${functionName}] Sending request with params:`, params);
     
     const res = await axiosClient.get('/api/user/manager/find', { params });
     
+    // Handle successful response or non-200 codes that didn't throw
     if (res?.data?.code === 200) {
         console.log(`[${functionName}] Search successful for term: ${searchTerm}`);
+        // Return empty list if data.list is not an array or is empty
+        if (!Array.isArray(res.data.list) || res.data.list.length === 0) {
+             console.log(`[${functionName}] Search successful but returned empty list for term: ${searchTerm}`);
+             // You might want to return an empty list structure if needed by the component
+             // return { code: 200, message: '未找到用户', list: [], totalCount: 0 }; 
+             // For now, let's rely on the component handling the empty array from res.data
+        }
         return res.data;
     } else {
-        const errorMsg = res?.data?.message || `搜索用户列表失败 (Term: ${searchTerm})`;
-        console.error(`[${functionName}] Search failed:`, res);
+        // Handle non-200 codes reported in the response body
+        const errorMsg = res?.data?.message || `搜索用户列表失败 (Code: ${res?.data?.code}, Term: ${searchTerm})`;
+        console.error(`[${functionName}] Search failed (non-200 code in response):`, res);
         showFail(functionName, errorMsg);
         throw new Error(errorMsg);
     }
   } catch (error) {
+    // --- MODIFIED CATCH BLOCK for 404 --- 
     const errorMsg = error.message || `搜索用户列表时发生网络错误 (Term: ${searchTerm})`;
-    console.error(`[${functionName}] Network/Request Error:`, error);
-    showFail(functionName, errorMsg);
+    console.error(`[${functionName}] Error caught:`, error);
+    
+    // Check if it's specifically a 404 error
+    if (error.isAxiosError && error.response?.status === 404) {
+      console.log(`[${functionName}] Received 404 Not Found. Suppressing global message.`);
+      // DO NOT call showFail for 404 errors
+    } else {
+      // For all other errors (network, 500, etc.), show the global message
+      showFail(functionName, errorMsg);
+    }
+    // Always re-throw the error so the calling component's catch block runs
     throw error;
+    // --- END MODIFIED CATCH BLOCK ---
   }
 }
 
